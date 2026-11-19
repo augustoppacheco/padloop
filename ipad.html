@@ -271,6 +271,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Toque num pad: ele pisca e entra certinho no próximo compasso (ou tempo). Toque de novo: ele para no próximo compasso.<br>
   • Efeitos: no ⚙ de cada pad tem Reverb e Delay, sempre presos ao BPM. No reverb você escolhe o tamanho (em tempos); no delay, a velocidade (1/4, 1/8, pontuada, tercina…). Se mudar o BPM, os efeitos acompanham.<br>
   • Ambiência: carregue um arquivo por tom (C a B). Toque num tom e ele entra no próximo compasso, trocando suavemente do tom anterior. Toque no centro (ou no tom ativo) pra parar. “Transição” define se a troca é curta, média ou longa.<br>
+  • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
   • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
   • “Pad entra no: Na hora” (experimental): o pad dispara no instante do toque. Loops ficam repetindo a partir desse ponto; batidas escolhidas seguem os tempos do clique. Tocar de novo para na hora. Volte para “Compasso” para o jeito anterior.<br>
   • Se nada estiver tocando, tocar um pad já liga o andamento.<br>
@@ -321,6 +322,14 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
         <div class="knob"><div class="kh"><span>Quantidade</span><output id="dlyMixO"></output></div><input type="range" id="dlyMix" min="0" max="1" step="0.01"></div>
       </div>
     </div>
+    <div class="fxb" id="fxCut">
+      <div class="fxh"><div><b>Tirar ataque</b><small>Some com o começo do som e deixa só o resto</small></div><button class="sw" id="cutOn" aria-label="Tirar ataque"></button></div>
+      <div class="fxbody" id="cutBody"><div class="knob"><div class="kh" style="margin-bottom:6px"><span>Quanto tirar</span></div>
+        <div class="seg" id="cutLen"><button data-v="1">Pouco</button><button data-v="2">Médio</button><button data-v="3">Muito</button></div></div></div>
+    </div>
+    <div class="fxb" id="fxRvs">
+      <div class="fxh"><div><b>Reverso</b><small>Toca o áudio de trás para frente</small></div><button class="sw" id="rvsOn" aria-label="Reverso"></button></div>
+    </div>
     <div class="fxb" id="fxCmp">
       <div class="fxh"><div><b>Compressor</b><small>Segura os picos e deixa o som mais firme</small></div></div>
       <div class="fxbody"><div class="knob"><div class="kh"><span>Quantidade</span><output id="cmpO"></output></div><input type="range" id="cmpAmt" min="0" max="1" step="0.01"></div></div>
@@ -350,6 +359,19 @@ function saveS(){try{localStorage.setItem('padloop_ipad_s',JSON.stringify(S))}ca
 
 const pads=Array.from({length:NPADS},(_,i)=>({i,name:'',mode:'loop',bars:'auto',entry:'next',steps:[1,0,0,0,1,0,0,0,0,0,0,0],barsOn:[1,1,1,1,1,1,1,1],vol:0.9,color:COLORS[i%COLORS.length],comp:0,rev:{on:false,size:2,mix:0.35},dly:{on:false,div:4,fb:0.35,mix:0.3},
   buffer:null,bytes:null,fileName:'',demo:null,state:'idle',startBeat:0,lastTrigger:0,voice:null,endTime:0,gain:null,el:null}));
+
+/* ---------- reverso e "tirar ataque": processa o áudio do pad ---------- */
+const CUT_LEN={1:0.08,2:0.2,3:0.45};
+function procBuf(p){const raw=p._raw;if(!raw)return raw;const cut=p.cut||0,rv=!!p.rvs;if(!cut&&!rv)return raw;
+  const key=cut+'|'+rv;if(p._pc&&p._pc.raw===raw&&p._pc.key===key)return p._pc.buf;
+  const n=raw.length,out=new AudioBuffer({length:n,numberOfChannels:raw.numberOfChannels,sampleRate:raw.sampleRate});
+  const chans=[];for(let c=0;c<raw.numberOfChannels;c++){const a=raw.getChannelData(c),b=out.getChannelData(c);if(rv){for(let k=0;k<n;k++)b[k]=a[n-1-k]}else b.set(a);chans.push(b)}
+  if(cut){let pk=0;for(const b of chans)for(let k=0;k<n;k++){const v=Math.abs(b[k]);if(v>pk)pk=v}
+    let on=0;const th=pk*0.08;outer:for(let k=0;k<n;k++)for(const b of chans)if(Math.abs(b[k])>th){on=k;break outer}
+    const L=Math.max(1,Math.floor(CUT_LEN[cut]*raw.sampleRate));
+    for(const b of chans){for(let k=0;k<on;k++)b[k]=0;for(let k=0;k<L&&on+k<n;k++){const x=k/L;b[on+k]*=x*x*x}}}
+  p._pc={raw,key,buf:out};return out}
+pads.forEach(p=>{p._raw=p.buffer;delete p.buffer;Object.defineProperty(p,'buffer',{get(){return procBuf(this)},set(v){this._raw=v;this._pc=null},enumerable:false,configurable:true})});
 
 let ctx=null,merger,clickBus,musicBus,cL,cR,mL,mR,mCmp,mMk,mVolN,ambBus;
 let lastBarTime=0,running=false,timer=null,nextBeatTime=0,beatIndex=0,visQ=[],wakeLock=null;
@@ -475,14 +497,14 @@ function regenDemos(){clearTimeout(demoTimer);demoTimer=setTimeout(()=>{if(!ctx)
 let db=null;
 function openDB(){return new Promise(res=>{setTimeout(res,1500);try{const r=indexedDB.open('padloop_ipad',1);r.onupgradeneeded=()=>r.result.createObjectStore('pads');r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>res();r.onblocked=()=>res()}catch(e){res()}})}
 function dbGet(k){return new Promise(res=>{if(!db)return res(null);try{const r=db.transaction('pads').objectStore('pads').get(k);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)}catch(e){res(null)}})}
-function savePad(p){if(!db)return;try{db.transaction('pads','readwrite').objectStore('pads').put({name:p.name,steps:p.steps,barsOn:p.barsOn,entry:p.entry,mode:p.mode,bars:p.bars,vol:p.vol,color:p.color,bytes:p.bytes,fileName:p.fileName,demo:p.demo,rev:p.rev,dly:p.dly,comp:p.comp},p.i)}catch(e){}}
+function savePad(p){if(!db)return;try{db.transaction('pads','readwrite').objectStore('pads').put({name:p.name,steps:p.steps,barsOn:p.barsOn,entry:p.entry,mode:p.mode,bars:p.bars,vol:p.vol,color:p.color,bytes:p.bytes,fileName:p.fileName,demo:p.demo,rev:p.rev,dly:p.dly,comp:p.comp,cut:p.cut||0,rvs:!!p.rvs},p.i)}catch(e){}}
 function decode(ab){return new Promise((res,rej)=>{try{const pr=ctx.decodeAudioData(ab.slice(0),res,rej);if(pr&&pr.catch)pr.catch(rej)}catch(e){rej(e)}})}
 async function loadPads(){
   await openDB();
   for(const p of pads){try{
     const rec=await dbGet(p.i);
     if(rec){Object.assign(p,{steps:rec.steps||p.steps,barsOn:rec.barsOn||p.barsOn,entry:rec.entry||'next',name:rec.name||'',mode:rec.mode||'loop',bars:rec.bars||'auto',vol:rec.vol??0.9,color:rec.color||COLORS[p.i%COLORS.length],bytes:rec.bytes||null,fileName:rec.fileName||'',demo:rec.demo||null});
-      p.comp=rec.comp||0;
+      p.comp=rec.comp||0;p.cut=rec.cut||0;p.rvs=!!rec.rvs;
       if(rec.rev)p.rev=Object.assign({},p.rev,rec.rev);if(rec.dly)p.dly=Object.assign({},p.dly,rec.dly);
       p.gain.gain.value=p.vol;
       if(p.bytes){try{p.buffer=await decode(p.bytes)}catch(e){p.buffer=null}}
@@ -588,7 +610,7 @@ function view(p){
   ['armed','playing','stopping'].forEach(s=>el.classList.toggle(s,has&&p.state===s));
   
   el.style.setProperty('--c',p.color);
-  el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')):'';
+  el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')+(p.cut?'<i>−ATQ</i>':'')+(p.rvs?'<i>◀◀</i>':'')):'';
   el.querySelector('.nm').textContent=has?(p.name||('Pad '+(p.i+1))):'+ Adicionar áudio';
   const en=p.entry==='next'?'':' · entra no '+((+p.entry-1)%S.cycle+1);
   el.querySelector('.sub').textContent=!has?'':(p.mode==='steps'?stepsLabel(p):p.mode==='once'?'Uma vez':p.mode==='cont'?'Contínuo':('Loop · '+(p.bars==='auto'?autoBars(p)+' comp. (auto)':p.bars+' comp.')))+en;
@@ -657,10 +679,17 @@ function fxView(p){
   $('revSizeO').textContent=revLabel(p);$('revMixO').textContent=Math.round(p.rev.mix*100)+'%';
   $('dlyDivO').textContent=dlyLabel(p);$('dlyFbO').textContent=p.dly.fb<0.05?'1':p.dly.fb<0.3?'poucas':p.dly.fb<0.6?'médias':'muitas';$('dlyMixO').textContent=Math.round(p.dly.mix*100)+'%';
   $('cmpAmt').value=p.comp||0;$('cmpO').textContent=compLabel(p.comp||0);$('fxCmp').classList.toggle('on',(p.comp||0)>0.01);
+  $('cutOn').classList.toggle('on',!!p.cut);$('fxCut').classList.toggle('on',!!p.cut);$('cutBody').classList.toggle('off',!p.cut);
+  [...$('cutLen').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v===(p.cut||p._cutLast||2)));
+  $('rvsOn').classList.toggle('on',!!p.rvs);$('fxRvs').classList.toggle('on',!!p.rvs);
   document.querySelectorAll('#modal input[type=range]').forEach(paintRange);
 }
 function fxChanged(){const p=editing;if(!p)return;applyFx(p);fxView(p);view(p);savePad(p)}
 $('cmpAmt').addEventListener('input',e=>{if(editing){editing.comp=+e.target.value;fxChanged()}});
+$('cutOn').onclick=()=>{const p=editing;if(!p)return;if(p.cut){p._cutLast=p.cut;p.cut=0}else p.cut=p._cutLast||2;fxChanged()};
+[...$('cutLen').children].forEach(b=>b.onclick=()=>{const p=editing;if(!p)return;p.cut=+b.dataset.v;p._cutLast=p.cut;fxChanged()});
+$('rvsOn').onclick=()=>{if(!editing)return;editing.rvs=!editing.rvs;fxChanged()};
+window.__pl={pads,openEdit};
 $('revOn').onclick=()=>{if(!editing)return;editing.rev.on=!editing.rev.on;fxChanged()};
 $('dlyOn').onclick=()=>{if(!editing)return;editing.dly.on=!editing.dly.on;fxChanged()};
 $('revSize').addEventListener('input',e=>{if(editing){editing.rev.size=+e.target.value;fxChanged()}});
