@@ -367,7 +367,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
   • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
   • “Pad entra no: Na hora” (experimental): o pad dispara no instante do toque. Loops ficam repetindo a partir desse ponto; batidas escolhidas seguem os tempos do clique. Tocar de novo para na hora. Volte para “Compasso” para o jeito anterior.<br>
-  • Botão grande do meio (Pausar/Voltar): para de uma vez todos os pads que estão tocando, sem mexer na ambiência nem no clique. Tocando de novo, os mesmos pads voltam de onde pararam, cada um no seu ponto (a distância entre eles continua igual). No “Na hora” voltam no instante do toque; em Compasso/Tempo voltam encaixados no clique. “Parar pads” para tudo e esquece a pausa. No teclado: Enter ou P.<br>
+  • Botão grande do meio (Pausar/Voltar): para de uma vez todos os pads que estão tocando, sem mexer na ambiência nem no clique. Tocando de novo, os mesmos pads voltam de onde pararam (a partir do compasso seguinte ao da pausa). Eles voltam sempre no próximo compasso, cada um no mesmo tempo do clique em que estava (o que estava no 1 continua no 1). “Parar pads” para tudo e esquece a pausa. No teclado: Enter ou P.<br>
   • Se nada estiver tocando, tocar um pad já liga o andamento.<br>
   • ⚙ em cada pad: escolher o áudio do seu iPhone (app Arquivos), nome, cor, volume, loop ou “uma vez”.<br>
   • Loop “Automático” calcula quantos compassos o áudio tem pelo BPM. Grave/exporte seus loops no mesmo BPM que vai usar — o app ainda não estica o tempo do áudio.<br>
@@ -773,17 +773,18 @@ function hubTap(t0){
   if(!ctx)return;wake();
   const act=pads.filter(pausable);
   if(act.length){const P=ctx.currentTime;paused=act.map(p=>snapPad(p,P));pads.forEach(p=>{if(p.state!=='idle'){stopVoice(p,P);p.state='idle';p.free=false;view(p)}})}
-  else if(paused.length){const list=paused.filter(s=>{const p=pads[s.i];return p&&p.buffer&&p.state==='idle'});const P=paused[0].P;paused=[];
-    if(list.length){const now=ctx.currentTime,wasRunning=running;if(!running)startTransport();
-      // quanto o tempo "andou" na pausa: tudo é empurrado igual, então cada pad volta de onde parou e a distância entre eles não muda
-      let shift;
-      if(S.quant==='now'||!wasRunning){const R=(t0&&t0<=now&&now-t0<0.4)?t0:now+0.01;shift=R-P}
-      else{const u=(60/S.bpm)*(S.quant==='bar'?S.beats:1);shift=Math.max(1,Math.ceil((now+0.03-P)/u))*u} // Compasso/Tempo: volta no próximo compasso/tempo, sem sair da grade do clique
+  else if(paused.length){const list=paused.filter(s=>{const p=pads[s.i];return p&&p.buffer&&p.state==='idle'});const B=paused[0].B;paused=[];
+    if(list.length){if(!running)startTransport();
+      // volta sempre no próximo compasso do clique. O compasso em que pausou é pulado e cada pad
+      // continua do compasso seguinte, no mesmo tempo do clique em que estava (o do 1 continua no 1, o do 3 no 3)
+      const tol=0.2*60/S.bpm,shift=barAt(ctx.currentTime+tol+0.03)-B;
       list.forEach(s=>{const p=pads[s.i];try{resumePad(p,s,shift)}catch(e){p.state='idle';p.free=false;if(__errs.length<50)__errs.push('voltar pad '+(p.i+1)+': '+e.message)}view(p)})}}
   hubView();
 }
 /* guarda onde o pad estava no instante da pausa */
-function snapPad(p,P){const s={i:p.i,P,armed:p.state==='armed'};if(s.armed)return s;
+/* início do compasso do clique no instante X ou logo depois */
+function barAt(X){const spb=60/S.bpm;let n=Math.ceil((X-nextBeatTime)/spb-0.001);while((((beatIndex+n)%S.beats)+S.beats)%S.beats!==0)n++;return nextBeatTime+n*spb}
+function snapPad(p,P){const s={i:p.i,P,B:barAt(P),armed:p.state==='armed'};s.E=Math.max(P,s.B-0.2*60/S.bpm); // E: um pouco antes do compasso, pra não perder um toque que foi dado levemente adiantadoif(s.armed)return s;
   const spb=60/S.bpm,h=spb/2;
   if(p.mode==='steps'){
     if(p.free){let T=p.nextT,j=p.stepIdx;while(j>0&&T-h>=P-0.001){T-=h;j--}s.T=T;s.j=j}       // volta os toques já agendados à frente
@@ -798,10 +799,11 @@ function startAt(p,when,off){
   p.voice={src,g};p.lastTrigger=when-off;p.endTime=p.lastTrigger+p.buffer.duration;
 }
 function resumePad(p,s,shift){
-  if(s.armed){if(S.quant==='now')startNow(p,s.P+shift);else{p.free=false;p.state='armed'}return}
+  if(s.armed){if(S.quant==='now')startNow(p,s.B+shift);else{p.free=false;p.state='armed'}return}
   p.state='playing';p.free=true;p.startBeat=beatIndex;p.hits=[];
-  if(p.mode==='steps'){p.nextT=s.T+shift;p.stepIdx=s.j;freeSteps(p);return}
-  const R=s.P+shift,pos=s.P-s.start,D=p.buffer.duration;
+  if(p.mode==='steps'){let T=s.T,j=s.j;const h=30/S.bpm;while(T<s.E-0.001){T+=h;j++}p.nextT=T+shift;p.stepIdx=j;freeSteps(p);return}
+  if(p.mode==='loop')while(s.start+s.L<=s.E+0.001)s.start+=s.L;  // repetições que cairiam no compasso pulado
+  const R=s.B+shift,pos=s.B-s.start,D=p.buffer.duration;
   if(pos<0){startAt(p,s.start+shift,0)}                                   // ainda ia começar: começa no ponto certo
   else if(p.mode==='cont'||pos<D-0.005){startAt(p,R,p.mode==='cont'?pos%D:pos)} // continua o áudio do ponto onde parou
   else p.lastTrigger=s.start+shift;
