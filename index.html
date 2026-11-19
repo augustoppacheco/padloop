@@ -297,6 +297,8 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   <div class="amb">
     <div class="ring" id="ring"><button class="core" id="ambCore"><span class="ck" id="ambKey">—</span><span class="cs" id="ambState">Parado</span></button></div>
     <div class="ambside">
+      <div class="opt"><span class="lbl">Som do pad</span>
+        <select id="ambSet"></select></div>
       <div class="opt"><span class="lbl">Transição</span>
         <div class="seg" id="ambFade"><button data-v="1">Curta</button><button data-v="2">Média</button><button data-v="3">Longa</button></div></div>
       <div class="vol" style="margin:0"><label>Volume</label><input type="range" id="ambVol" min="0" max="1" step="0.01"></div>
@@ -306,7 +308,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
       </div>
       <input type="file" id="ambFiles" multiple accept="audio/*,.mp3,.wav,.m4a,.aif,.aiff,.caf,.aac,.ogg,.flac" style="display:none">
       <input type="file" id="ambOne" accept="audio/*,.mp3,.wav,.m4a,.aif,.aiff,.caf,.aac,.ogg,.flac" style="display:none">
-      <div class="mut" id="ambMsg">Selecione todos os seus pads de uma vez: o app reconhece o tom pelo nome do arquivo (ex.: “Pad C#.wav”, “Ambient Bb.m4a”, “Pad Ré.wav”). Os 12 tons já vêm carregados com os pads Warm. Se carregar um arquivo seu, ele substitui o daquele tom.</div>
+      <div class="mut" id="ambMsg">Selecione todos os seus pads de uma vez: o app reconhece o tom pelo nome do arquivo (ex.: “Pad C#.wav”, “Ambient Bb.m4a”, “Pad Ré.wav”). Os 12 tons já vêm carregados com o som escolhido em “Som do pad”. Se carregar um arquivo seu, ele substitui o daquele tom.</div>
     </div>
   </div>
 </div>
@@ -442,7 +444,7 @@ window.__errs=[];window.addEventListener('error',e=>{__errs.push(e.message)});wi
 const NPADS=8;
 const COLORS=['#ff5d73','#ffb020','#4fd18b','#4fc3f7','#a78bfa','#f472b6','#facc15','#94a3b8'];
 const DEMOS=[['kick1','Bumbo'],['snare1','Caixa'],['hat','Chimbal'],['pad','Pad ambiente'],['bass','Baixo']];
-const S={cycle:4,bpm:90,beats:4,quant:'now',route:'clickL',clickOn:true,clickVol:0.8,musicVol:0.9,mComp:0.25,ambVol:0.8,ambFade:2};
+const S={cycle:4,bpm:90,beats:4,quant:'now',route:'clickL',clickOn:true,clickVol:0.8,musicVol:0.9,mComp:0.25,ambVol:0.8,ambFade:2,ambSet:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem('padloop_s')||'{}'))}catch(e){}
 if(S.qv!==2){S.quant='now';S.qv=2}  // "Na hora" virou o padrão
 function saveS(){try{localStorage.setItem('padloop_s',JSON.stringify(S))}catch(e){}}
@@ -900,7 +902,7 @@ $('kitImp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
   const put1=(key,rec)=>new Promise((res,rej)=>{const tx=db.transaction('pads','readwrite'),st=tx.objectStore('pads');if(rec)st.put(rec,key);else st.delete(key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error||new Error('não deu para salvar'));tx.onabort=()=>rej(tx.error||new Error('sem espaço no aparelho'))});
   for(let i=0;i<n;i++){kitMsg('Importando pad '+(i+1)+' de '+n+'…');await put1(i,unpackRec(kit.pads[i]));kit.pads[i]=null}
   const am=kit.amb||[];for(let k=0;k<am.length;k++){const u=unpackRec(am[k]);am[k]=null;await put1('amb'+k,u&&u.bytes?u:null)}
-  if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','mComp','ambVol','ambFade'])if(k in kit.S)S[k]=kit.S[k];saveS()}
+  if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','mComp','ambVol','ambFade','ambSet'])if(k in kit.S)S[k]=kit.S[k];saveS()}
   kitMsg('Kit importado! Recarregando…');setTimeout(()=>location.reload(),600)
 }catch(err){kitMsg('Não deu para importar: '+err.message)}};
 window.__pl={pads,openEdit};
@@ -972,7 +974,12 @@ document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.
 /* ---------- ambiência por tom ---------- */
 const KEYS=['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
 // Pads de ambiência embutidos (loops de 60 s preparados a partir dos arquivos do Augusto). loop: [0.5 s, 60.5 s]
-const AMB_BUILTIN={0:'amb/C.mp3',1:'amb/Db.mp3',2:'amb/D.mp3',3:'amb/Eb.mp3',4:'amb/E.mp3',5:'amb/F.mp3',6:'amb/Gb.mp3',7:'amb/G.mp3',8:'amb/Ab.mp3',9:'amb/A.mp3',10:'amb/Bb.mp3',11:'amb/B.mp3'};
+// Sons de pad embutidos: 12 tons cada (C … B), mesma nomenclatura de arquivo em cada pasta. ls/le = trecho do loop em segundos.
+const AMB_FILES=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+// g = volume do som (deixa os três parecidos). Novos sons: transpostos SEMPRE pra cima a partir do Dó original.
+const AMB_SETS=[{name:'Warm',dir:'amb',ls:0.5,le:60.5,g:0.75},{name:'Conce',dir:'amb-conce',ls:0.5,le:60.5,g:1},{name:'Paradise',dir:'amb-paradise',ls:0.5,le:60.5,g:1}];
+function ambSetCur(){return AMB_SETS[S.ambSet]||AMB_SETS[0]}
+function ambUrl(k){return ambSetCur().dir+'/'+AMB_FILES[k]+'.mp3'}
 const amb={user:Array(12).fill(null),loading:Array(12).fill(false),bufs:Array(12).fill(null),names:Array(12).fill(''),demo:Array(12).fill(null),cur:null,pending:null,voice:null,edit:false,editKey:null};
 function keyFromName(name){
   const n=name.replace(/\.[^.]+$/,'');let best=null;
@@ -991,7 +998,7 @@ function makeAmbDemo(k){
   for(let i=0;i<len;i++){const t=i/sr;let v=0;for(const[f,a]of fr)v+=a*Math.sin(2*Math.PI*f*t);d[i]=v*(1+0.22*Math.sin(2*Math.PI*t/4))}
   let pk=0;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(d[i]));for(let i=0;i<len;i++)d[i]*=0.6/pk;
   const b=ctx.createBuffer(1,len,sr);b.getChannelData(0).set(d);return b}
-function ambHas(k){return !!(amb.user[k]||AMB_BUILTIN[k])}
+function ambHas(k){return !!(amb.user[k]||ambUrl(k))}
 /* arquivo longo (ex.: 10 min) -> loop mono de 60 s com emenda suave, pra não pesar a memória do iPhone */
 function makeLoop(buf){
   const sr=buf.sampleRate,ch=buf.numberOfChannels,L=Math.round(60*sr),CF=Math.round(5*sr);
@@ -1005,7 +1012,7 @@ async function ambEnsure(k){
   if(amb.bufs[k])return amb.bufs[k];
   try{
     if(amb.user[k]){amb.bufs[k]=makeLoop(await decode(amb.user[k]))}
-    else if(AMB_BUILTIN[k]){const r=await fetch(AMB_BUILTIN[k]);if(!r.ok)throw new Error(r.status);const b=await decode(await r.arrayBuffer());b.__ls=0.5;b.__le=Math.min(b.duration,60.5);amb.bufs[k]=b}
+    else{const st=ambSetCur(),r=await fetch(ambUrl(k));if(!r.ok)throw new Error(r.status);const b=await decode(await r.arrayBuffer());if(st!==ambSetCur())return ambEnsure(k);b.__ls=st.ls;b.__le=Math.min(b.duration,st.le);b.__g=st.g||1;amb.bufs[k]=b}
   }catch(e){__errs.push('amb '+KEYS[k]+': '+e.message);$('ambMsg').textContent='Não consegui abrir o pad de '+KEYS[k]+' aqui. Tocando som de teste.'}
   if(!amb.bufs[k]){if(!amb.demo[k])amb.demo[k]=makeAmbDemo(k);return amb.demo[k]}
   return amb.bufs[k]}
@@ -1017,7 +1024,7 @@ function ambGo(k,t){
   if(k===null){amb.cur=null;ambView();return}
   const buf=amb.bufs[k]||amb.demo[k]||(amb.demo[k]=makeAmbDemo(k));
   const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=buf;src.loop=true;if(buf.__le){src.loopStart=buf.__ls;src.loopEnd=buf.__le}g.gain.value=0;
-  src.connect(g);g.connect(ambBus);g.gain.setValueAtTime(0,t);g.gain.setTargetAtTime(1,t,tc);src.start(t);
+  src.connect(g);g.connect(ambBus);g.gain.setValueAtTime(0,t);g.gain.setTargetAtTime(buf.__g||1,t,tc);src.start(t);
   amb.voice={src,g,k};amb.cur=k;setTimeout(()=>{ambFree();ambView()},Math.max(0,(t-ctx.currentTime)*1000)+3000);setTimeout(ambView,Math.max(0,(t-ctx.currentTime)*1000));ambView();
 }
 function ambTap(k){
@@ -1061,6 +1068,13 @@ $('ambOne').addEventListener('change',async e=>{const f=e.target.files&&e.target
   try{await ambSetFile(k,f);$('ambMsg').textContent='Tom '+KEYS[k]+': '+f.name}catch(err){$('ambMsg').textContent='Não consegui abrir esse arquivo. Tente WAV, MP3 ou M4A.'}ambView()});
 $('ambLoad').onclick=()=>{if(!ctx)return;$('ambFiles').value='';$('ambFiles').click()};
 $('ambEdit').onclick=()=>{amb.edit=!amb.edit;ambView()};
+function buildAmbSets(){const el=$('ambSet');el.innerHTML=AMB_SETS.map((st,i)=>'<option value="'+i+'">'+st.name+'</option>').join('');if(!AMB_SETS[S.ambSet])S.ambSet=0;el.value=String(S.ambSet)}
+$('ambSet').onchange=e=>{S.ambSet=+e.target.value;saveS();
+  for(let i=0;i<12;i++)if(!amb.user[i])amb.bufs[i]=null;
+  const k=amb.pending!==null?amb.pending:amb.cur;if(k===null||!ctx||amb.user[k])return;
+  // troca pro mesmo tom no som novo, com a transição escolhida (no próximo compasso se o clique estiver rodando)
+  if(running)amb.pending=k;amb.loading[k]=true;ambView();
+  ambEnsure(k).then(()=>{amb.loading[k]=false;if(amb.pending===null||amb.pending===k){if(!running)ambGo(k,ctx.currentTime+0.03);else amb.pending=k}ambView()})};
 $('ambFade').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.ambFade=+b.dataset.v;saveS();segView('ambFade',String(S.ambFade))};
 $('ambVol').value=S.ambVol;$('ambVol').oninput=e=>{S.ambVol=+e.target.value;saveS();applyVols()};
 $('mComp').value=S.mComp;$('mCompO').textContent=compLabel(S.mComp);
@@ -1072,7 +1086,7 @@ $('unlockBtn').onclick=async()=>{if(ctx){wake();$('unlock').classList.add('hidde
   await loadPads()};
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
 
-buildDots();buildBars();buildPads();buildRing();segView('ambFade',String(S.ambFade));clickView();segView('quant',S.quant);segView('route',S.route);$('routeInfo').textContent=RINFO[S.route];
+buildDots();buildBars();buildPads();buildRing();buildAmbSets();segView('ambFade',String(S.ambFade));clickView();segView('quant',S.quant);segView('route',S.route);$('routeInfo').textContent=RINFO[S.route];
 document.querySelectorAll('input[type=range]').forEach(paintRange);
 requestAnimationFrame(frame);
 })();
