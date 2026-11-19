@@ -11,6 +11,42 @@
 <link rel="icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-title" content="Pad Loop">
 <script>
+/* Compatibilidade com iPhone/iPad antigos (iOS 12+) e "modo leve" para aparelhos lentos */
+(function(){
+var d=document.documentElement,ua=navigator.userAgent,v=0,m=ua.match(/OS (\d+)_(\d+)/);
+if(m&&/iP(hone|ad|od)/.test(ua))v=+m[1]+(+m[2])/100;
+else if(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1){m=ua.match(/Version\/(\d+)\.(\d+)/);if(m)v=+m[1]+(+m[2])/100}
+window.__iosV=v;
+/* arquivos: Blob.arrayBuffer / Blob.text (iOS < 14) */
+function rd(b,t){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=function(){rej(r.error)};t?r.readAsText(b):r.readAsArrayBuffer(b)})}
+if(window.Blob&&!Blob.prototype.arrayBuffer)Blob.prototype.arrayBuffer=function(){return rd(this,0)};
+if(window.Blob&&!Blob.prototype.text)Blob.prototype.text=function(){return rd(this,1)};
+if(window.Element&&!Element.prototype.setPointerCapture)Element.prototype.setPointerCapture=function(){};
+/* toque: pointer events não existem no iOS 12 -> gera a partir dos eventos de toque */
+if(!window.PointerEvent&&'ontouchstart' in window){
+  var tg={},fire=function(type,t,target,nat){var e=document.createEvent('Event');e.initEvent(type,true,true);
+    e.pointerId=t.identifier+1;e.pointerType='touch';e.isPrimary=true;e.clientX=t.clientX;e.clientY=t.clientY;e.pageX=t.pageX;e.pageY=t.pageY;
+    target.dispatchEvent(e);if(e.defaultPrevented&&nat.cancelable)nat.preventDefault()};
+  var on=function(n,f){document.addEventListener(n,f,{capture:true,passive:false})};
+  on('touchstart',function(ev){for(var i=0;i<ev.changedTouches.length;i++){var t=ev.changedTouches[i],el=t.target.nodeType===1?t.target:t.target.parentNode;tg[t.identifier]=el;fire('pointerdown',t,el,ev)}});
+  on('touchmove',function(ev){for(var i=0;i<ev.changedTouches.length;i++){var t=ev.changedTouches[i];if(tg[t.identifier])fire('pointermove',t,tg[t.identifier],ev)}});
+  var end=function(type){return function(ev){for(var i=0;i<ev.changedTouches.length;i++){var t=ev.changedTouches[i],el=tg[t.identifier];if(el){delete tg[t.identifier];fire(type,t,el,ev)}}}};
+  on('touchend',end('pointerup'));on('touchcancel',end('pointercancel'));
+}
+/* sem "gap" em flexbox (iOS < 14.5) */
+try{var f=document.createElement('div');f.style.cssText='display:flex;flex-direction:column;row-gap:1px;position:absolute';f.appendChild(document.createElement('div'));f.appendChild(document.createElement('div'));
+  d.appendChild(f);if(f.scrollHeight!==1)d.className+=' nogap';d.removeChild(f)}catch(e){}
+/* modo leve: sem desfoque de vidro nem animações pesadas.
+   Liga sozinho em iOS antigo ou se a tela estiver lenta. ?leve=1 força ligado, ?leve=0 desliga. */
+var k='padloop_leve',q=location.search,pref=null;
+try{if(/[?&]leve=1/.test(q))localStorage.setItem(k,'1');if(/[?&]leve=0/.test(q))localStorage.setItem(k,'0');pref=localStorage.getItem(k)}catch(e){}
+var lite=function(){if(d.className.indexOf('lite')<0)d.className+=' lite'};
+if(pref==='1'||(pref!=='0'&&v&&v<16))lite();
+if(pref===null&&window.requestAnimationFrame){var n=0,t0=0,slow=0;var tick=function(ts){n++;if(n===30)t0=ts;else if(n>30&&n<=90){if(n===90){if((ts-t0)/60>24)lite();return}}requestAnimationFrame(tick)};
+  setTimeout(function(){requestAnimationFrame(tick)},1200)}
+})();
+</script>
+<script>
 (function(){try{var q=location.search,k='padloop_layout';
 if(/[?&]iphone/.test(q))localStorage.setItem(k,'phone');if(/[?&]ipad/.test(q))localStorage.setItem(k,'pad');
 var p=localStorage.getItem(k),isPad=/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -92,7 +128,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .pad .fx{display:flex;gap:4px;position:relative;z-index:1;margin-bottom:6px;min-height:16px}
 .pad .fx i{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.06em;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);color:#fff}
 .pad .gear{position:absolute;top:7px;right:7px;width:36px;height:36px;padding:0;border-radius:12px;font-size:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1);z-index:2;color:rgba(255,255,255,.85)}
-.pad .fill{position:absolute;inset:0;opacity:0;transition:opacity .1s;background:radial-gradient(120% 90% at 50% 110%,var(--c),transparent 70%) !important}
+.pad .fill{position:absolute;top:0;right:0;bottom:0;left:0;opacity:0;transition:opacity .1s;background:radial-gradient(120% 90% at 50% 110%,var(--c),transparent 70%) !important}
 .pad .prog{position:absolute;left:0;bottom:0;height:4px;width:0;background:var(--c) !important;box-shadow:0 0 10px var(--c);z-index:1}
 .pad.empty{border:1.5px dashed rgba(255,255,255,.14);background:rgba(255,255,255,.02)}
 .pad.empty .nm{color:var(--mut);font-weight:600;font-size:14px}
@@ -112,7 +148,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .lr{display:inline-block;font-size:10px;font-weight:900;padding:2px 5px;border-radius:5px;margin-right:4px}
 .lrL{background:var(--l);color:#000}.lrR{background:var(--r);color:#000}
 /* overlay + modal */
-.ov{position:fixed;inset:0;background:rgba(3,4,6,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.ov{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(3,4,6,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .ov.hidden{display:none}
 #unlock button{font-size:19px;padding:20px 30px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#140a00;font-weight:800;border:none;border-radius:20px;box-shadow:0 12px 40px rgba(255,140,40,.4)}
 #modal{align-items:flex-end;padding:0}
@@ -145,7 +181,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .rk{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
 .rk .dial{width:68px;height:68px;border-radius:50%;position:relative;touch-action:pan-y;cursor:ew-resize;
   background:conic-gradient(from 225deg,var(--acc) 0 var(--a,0deg),rgba(255,255,255,.1) var(--a,0deg) 270deg,transparent 270deg)}
-.rk .dial::before{content:"";position:absolute;inset:7px;border-radius:50%;background:#1b1d23;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 4px 10px rgba(0,0,0,.4)}
+.rk .dial::before{content:"";position:absolute;top:7px;right:7px;bottom:7px;left:7px;border-radius:50%;background:#1b1d23;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 4px 10px rgba(0,0,0,.4)}
 .rk .dial i{position:absolute;left:50%;top:50%;width:3px;height:22px;margin-left:-1.5px;border-radius:2px;background:#fff;transform-origin:50% 0;transform:rotate(var(--r,180deg))}
 .rk b{font-size:13px}.rk output{font-size:12px;color:var(--mut);font-weight:700}
 .knob .kh{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);font-weight:600}
@@ -155,7 +191,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .amb{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
 @media(max-width:560px){.amb{grid-template-columns:1fr;justify-items:center}}
 .ring{position:relative;width:268px;height:268px;flex:none}
-.ring::before{content:"";position:absolute;inset:22px;border-radius:50%;border:1px solid var(--line);background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.04),transparent 70%)}
+.ring::before{content:"";position:absolute;top:22px;right:22px;bottom:22px;left:22px;border-radius:50%;border:1px solid var(--line);background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.04),transparent 70%)}
 .key{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;padding:0;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--mut);transition:background .25s,box-shadow .25s,color .2s,border-color .2s}
 .key.has{color:var(--txt);border-color:var(--line2);background:rgba(255,255,255,.09)}
@@ -166,9 +202,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .ring.edit .key{border-style:dashed;border-color:rgba(255,176,32,.6)}
 .core{position:absolute;left:50%;top:50%;width:128px;height:128px;margin:-64px 0 0 -64px;border-radius:50%;padding:0;border:1px solid var(--line2);
   background:radial-gradient(circle at 50% 35%,#1d2030,#0e1016);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden}
-.core::before{content:"";position:absolute;inset:-30%;background:conic-gradient(from 0deg,transparent,rgba(167,139,250,.35),rgba(79,195,247,.35),transparent 60%);opacity:0;transition:opacity .6s;animation:spin 8s linear infinite}
-.core.live::before{opacity:1}
-.core::after{content:"";position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#1d2030,#0e1016)}
+.core::before{content:"";position:absolute;top:-30%;right:-30%;bottom:-30%;left:-30%;background:conic-gradient(from 0deg,transparent,rgba(167,139,250,.35),rgba(79,195,247,.35),transparent 60%);opacity:0;transition:opacity .6s}
+.core.live::before{opacity:1;animation:spin 8s linear infinite}
+.core::after{content:"";position:absolute;top:3px;right:3px;bottom:3px;left:3px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#1d2030,#0e1016)}
 .core > *{position:relative;z-index:1}
 @keyframes spin{to{transform:rotate(360deg)}}
 .core .ck{font-size:38px;font-weight:800;letter-spacing:-.03em;line-height:1}
@@ -180,6 +216,22 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 details{color:var(--mut);font-size:14px;line-height:1.55}
 details summary{cursor:pointer;color:var(--txt);font-weight:700}
 #diag{opacity:.6}
+
+/* ---- compatibilidade / modo leve ---- */
+@supports not (color:color-mix(in srgb,red 50%,blue)){
+  .pad{border-color:var(--c45,rgba(255,255,255,.14));background:linear-gradient(160deg,var(--c26,rgba(255,255,255,.06)) 0%,rgba(0,0,0,0) 75%),#101217}
+  .pad.playing{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 10px 34px var(--c40,transparent)}
+}
+.nogap .row>*,.nogap .brand>*,.nogap .tempo>*,.nogap .dots>*,.nogap .bars>*,.nogap .ctrls>*,.nogap .seg>*,.nogap .pad .fx>*,.nogap .vol>*,.nogap .colors>*,.nogap .stepgrid>*,.nogap .eqrow>*{margin-right:7px}
+.nogap .row>*,.nogap .ctrls>*,.nogap .colors>*,.nogap .stepgrid>*{margin-bottom:6px}
+.nogap .opt>*,.nogap .rk>*,.nogap .ambside>*,.nogap .beatviz>*,.nogap .core>*{margin-bottom:6px}
+.lite *,.lite *::before,.lite *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.lite .card{background:#101217}
+.lite .ov{background:rgba(3,4,6,.94)}
+.lite .core::before,.lite .core.live::before{animation:none}
+.lite .pad.playing{box-shadow:0 0 0 1px var(--c)}
+.lite .pad .prog{box-shadow:none}
+.lite body{background:var(--bg)}
 </style>
 </head>
 <body>
@@ -465,16 +517,25 @@ function buildFx(p){
   const eqLo=ctx.createBiquadFilter(),eqMid=ctx.createBiquadFilter(),eqHi=ctx.createBiquadFilter();
   eqLo.type='lowshelf';eqLo.frequency.value=200;eqMid.type='peaking';eqMid.frequency.value=1000;eqMid.Q.value=0.8;eqHi.type='highshelf';eqHi.frequency.value=4000;
   const eqHp=ctx.createBiquadFilter(),eqLp=ctx.createBiquadFilter();eqHp.type='highpass';eqHp.frequency.value=10;eqHp.Q.value=0.707;eqLp.type='lowpass';eqLp.frequency.value=22000;eqLp.Q.value=0.707;
-  const cp=ctx.createDynamicsCompressor(),mk=ctx.createGain();p.gain.connect(eqLo);eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(eqHp);eqHp.connect(eqLp);eqLp.connect(cp);cp.connect(mk);mk.connect(musicBus);
+  const cp=ctx.createDynamicsCompressor(),mk=ctx.createGain();eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(eqHp);eqHp.connect(eqLp);
   const rs=ctx.createGain(),cv=ctx.createConvolver(),rw=ctx.createGain();
-  rs.gain.value=0;rw.gain.value=1.6;mk.connect(rs);rs.connect(cv);cv.connect(rw);rw.connect(musicBus);
+  rs.gain.value=0;rw.gain.value=1.6;rs.connect(cv);cv.connect(rw);
   const ds=ctx.createGain(),dl=ctx.createDelay(4),fb=ctx.createGain(),lp=ctx.createBiquadFilter(),hp=ctx.createBiquadFilter();
   ds.gain.value=0;lp.type='lowpass';lp.frequency.value=4200;hp.type='highpass';hp.frequency.value=180;
-  mk.connect(ds);ds.connect(hp);hp.connect(dl);dl.connect(lp);lp.connect(fb);fb.connect(dl);lp.connect(musicBus);
-  p.fx={eqLo,eqMid,eqHi,eqHp,eqLp,cp,mk,rs,cv,ds,dl,fb,irSecs:0};
+  ds.connect(hp);hp.connect(dl);dl.connect(lp);lp.connect(fb);fb.connect(dl);
+  p.fx={eqLo,eqMid,eqHi,eqHp,eqLp,cp,mk,rs,cv,rw,ds,dl,fb,lp,irSecs:0,sig:'',revOut:false,dlyOut:false};
+  wireFx(p);
 }
+/* liga só o que o pad usa: EQ, compressor, reverb e delay desligados não gastam processamento (importante em aparelhos antigos) */
+function wireFx(p){const f=p.fx;if(!f)return;const eq=p.eq||{},uEq=!!(eq.lo||eq.mid||eq.hi||eq.hp||eq.lp),uCp=(p.comp||0)>0.01,uRev=!!p.rev.on,uDly=!!p.dly.on;
+  const sig=[uEq,uCp,uRev,uDly].map(Number).join('');if(f.sig===sig)return;f.sig=sig;
+  [p.gain,f.eqLp,f.cp,f.mk].forEach(n=>{try{n.disconnect()}catch(e){}});
+  const tail=uCp?f.cp:f.mk;if(uEq){p.gain.connect(f.eqLo);f.eqLp.connect(tail)}else p.gain.connect(tail);if(uCp)f.cp.connect(f.mk);
+  f.mk.connect(musicBus);if(uRev)f.mk.connect(f.rs);if(uDly)f.mk.connect(f.ds);
+  if(uRev&&!f.revOut){f.rw.connect(musicBus);f.revOut=true}if(uDly&&!f.dlyOut){f.lp.connect(musicBus);f.dlyOut=true}
+  clearTimeout(f.offT);if((!uRev&&f.revOut)||(!uDly&&f.dlyOut))f.offT=setTimeout(()=>{if(!p.rev.on&&f.revOut){try{f.rw.disconnect()}catch(e){}f.revOut=false}if(!p.dly.on&&f.dlyOut){try{f.lp.disconnect()}catch(e){}try{f.lp.connect(f.fb)}catch(e){}f.dlyOut=false}},6000)}
 function applyFx(p,rebuildIR){
-  if(!ctx||!p.fx)return;const t=ctx.currentTime,f=p.fx;
+  if(!ctx||!p.fx)return;const t=ctx.currentTime,f=p.fx;wireFx(p);
   setComp(f.cp,f.mk,p.comp||0);
   const eq=p.eq||{};f.eqLo.gain.setTargetAtTime(eq.lo||0,t,0.02);f.eqMid.gain.setTargetAtTime(eq.mid||0,t,0.02);f.eqHi.gain.setTargetAtTime(eq.hi||0,t,0.02);
   f.eqHp.frequency.setTargetAtTime(eq.hp?hpHz(eq.hp):10,t,0.02);f.eqLp.frequency.setTargetAtTime(eq.lp?lpHz(eq.lp):22000,t,0.02);
@@ -520,7 +581,7 @@ async function loadPads(){
   await openDB();
   for(const p of pads){try{
     const rec=await dbGet(p.i);
-    if(rec){Object.assign(p,{steps:rec.steps||p.steps,barsOn:rec.barsOn||p.barsOn,entry:rec.entry||'next',name:rec.name||'',mode:rec.mode||'loop',bars:rec.bars||'auto',vol:rec.vol??0.9,color:rec.color||COLORS[p.i],bytes:rec.bytes||null,fileName:rec.fileName||'',demo:rec.demo||null});
+    if(rec){Object.assign(p,{steps:rec.steps||p.steps,barsOn:rec.barsOn||p.barsOn,entry:rec.entry||'next',name:rec.name||'',mode:rec.mode||'loop',bars:rec.bars||'auto',vol:rec.vol!=null?rec.vol:0.9,color:rec.color||COLORS[p.i],bytes:rec.bytes||null,fileName:rec.fileName||'',demo:rec.demo||null});
       p.comp=rec.comp||0;p.cut=rec.cut||0;p.rvs=!!rec.rvs;p.eq=rec.eq||{lo:0,mid:0,hi:0};
       if(rec.rev)p.rev=Object.assign({},p.rev,rec.rev);if(rec.dly)p.dly=Object.assign({},p.dly,rec.dly);
       p.gain.gain.value=p.vol;
@@ -626,7 +687,7 @@ function view(p){
   el.classList.toggle('empty',!has);
   ['armed','playing','stopping'].forEach(s=>el.classList.toggle(s,has&&p.state===s));
   
-  el.style.setProperty('--c',p.color);
+  el.style.setProperty('--c',p.color);if(p._cv!==p.color){p._cv=p.color;const h=(p.color||'#888').replace('#',''),x=h.length===3?h.split('').map(c=>c+c).join(''):h,rgb=[0,2,4].map(j=>parseInt(x.substr(j,2),16)).join(',');el.style.setProperty('--c45','rgba('+rgb+',.45)');el.style.setProperty('--c26','rgba('+rgb+',.26)');el.style.setProperty('--c40','rgba('+rgb+',.4)')}
   el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')+(p.eq&&(p.eq.lo||p.eq.mid||p.eq.hi)?'<i>EQ</i>':'')+(p.eq&&p.eq.hp?'<i>HP</i>':'')+(p.eq&&p.eq.lp?'<i>LP</i>':'')+(p.cut?'<i>−ATQ</i>':'')+(p.rvs?'<i>◀◀</i>':'')):'';
   el.querySelector('.nm').textContent=has?(p.name||('Pad '+(p.i+1))):'+ Adicionar áudio';
   const en=p.entry==='next'?'':' · entra no '+((+p.entry-1)%S.cycle+1);
@@ -665,7 +726,7 @@ function frame(){
       if((p.state==='playing'||p.state==='stopping')&&p.buffer&&now>=p.lastTrigger){
         const el=now-p.lastTrigger,D=p.buffer.duration;
         w=p.mode==='steps'?Math.min(1,(now-lastBarTime)/(S.beats*spb)):p.mode==='once'?Math.min(1,el/D):p.mode==='cont'?(el%D)/D:Math.min(1,el/(loopBeats(p)*spb))}
-      p.el.querySelector('.prog').style.width=(w*100)+'%';
+      const pw=Math.round(w*400)/4;if(p._pw!==pw){p._pw=pw;(p._prog||(p._prog=p.el.querySelector('.prog'))).style.width=pw+'%'}
       let hit=false;if(p.hits&&p.hits.length){while(p.hits.length&&now-p.hits[0]>0.09)p.hits.shift();hit=p.hits.some(h=>now>=h)}
       if(p.el.classList.contains('hit')!==hit)p.el.classList.toggle('hit',hit);
       if(p.el.classList.contains('armed')!==(p.state==='armed')||p.el.classList.contains('playing')!==(p.state==='playing')||p.el.classList.contains('stopping')!==(p.state==='stopping'))view(p);
@@ -714,10 +775,10 @@ function hzTxt(h){return h>=1000?(h/1000).toFixed(h>=10000?0:1).replace('.',',')
 function knobTxt(k,v){return k==='hp'?(v?hzTxt(hpHz(v)):'Desligado'):k==='lp'?(v?hzTxt(lpHz(v)):'Desligado'):eqTxt(v)}
 function eqView(p){const eq=p.eq||(p.eq={lo:0,mid:0,hi:0});let any=false;
   document.querySelectorAll('#fxEq .rk').forEach(el=>{const v=eq[el.dataset.k]||0;if(v)any=true;const d=el.querySelector('.dial');
-    const mn=+(el.dataset.min??-12),mx=+(el.dataset.max??12),fr=(v-mn)/(mx-mn);
+    const mn=+(el.dataset.min!=null?el.dataset.min:-12),mx=+(el.dataset.max!=null?el.dataset.max:12),fr=(v-mn)/(mx-mn);
     d.style.setProperty('--r',(45+fr*270)+'deg');d.style.setProperty('--a',(fr*270)+'deg');el.querySelector('output').textContent=knobTxt(el.dataset.k,v)});
   $('fxEq').classList.toggle('on',any)}
-document.querySelectorAll('#fxEq .rk').forEach(el=>{const d=el.querySelector('.dial'),k=el.dataset.k,mn=+(el.dataset.min??-12),mx=+(el.dataset.max??12);
+document.querySelectorAll('#fxEq .rk').forEach(el=>{const d=el.querySelector('.dial'),k=el.dataset.k,mn=+(el.dataset.min!=null?el.dataset.min:-12),mx=+(el.dataset.max!=null?el.dataset.max:12);
   // gira arrastando para os lados; arrastar para cima/baixo continua rolando a tela
   let x0=0,y0=0,v0=0,st=0,lastTap=0,pid=null; // st: 0 nada, 1 decidindo, 2 girando
   const setV=v=>{if(!editing)return;editing.eq=editing.eq||{lo:0,mid:0,hi:0,hp:0,lp:0};if(editing.eq[k]!==v){editing.eq[k]=v;applyFx(editing);eqView(editing);view(editing)}};
