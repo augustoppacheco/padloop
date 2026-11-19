@@ -428,7 +428,7 @@ const pads=Array.from({length:NPADS},(_,i)=>({i,name:'',mode:'loop',bars:'auto',
 const CUT_LEN={1:0.08,2:0.2,3:0.45};
 function procBuf(p){const raw=p._raw;if(!raw)return raw;const cut=p.cut||0,rv=!!p.rvs;if(!cut&&!rv)return raw;
   const key=cut+'|'+rv;if(p._pc&&p._pc.raw===raw&&p._pc.key===key)return p._pc.buf;
-  const n=raw.length,out=new AudioBuffer({length:n,numberOfChannels:raw.numberOfChannels,sampleRate:raw.sampleRate});
+  const n=raw.length,out=ctx.createBuffer(raw.numberOfChannels,n,raw.sampleRate);
   const chans=[];for(let c=0;c<raw.numberOfChannels;c++){const a=raw.getChannelData(c),b=out.getChannelData(c);if(rv){for(let k=0;k<n;k++)b[k]=a[n-1-k]}else b.set(a);chans.push(b)}
   if(cut){let pk=0;for(const b of chans)for(let k=0;k<n;k++){const v=Math.abs(b[k]);if(v>pk)pk=v}
     let on=0;const th=pk*0.08;outer:for(let k=0;k<n;k++)for(const b of chans)if(Math.abs(b[k])>th){on=k;break outer}
@@ -573,10 +573,14 @@ function regenDemos(){clearTimeout(demoTimer);demoTimer=setTimeout(()=>{if(!ctx)
 
 /* ---------- storage (IndexedDB) ---------- */
 let db=null;
-function openDB(){return new Promise(res=>{setTimeout(res,1500);try{const r=indexedDB.open('padloop',1);r.onupgradeneeded=()=>r.result.createObjectStore('pads');r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>res();r.onblocked=()=>res()}catch(e){res()}})}
+function openDB(){return new Promise(res=>{setTimeout(res,8000);try{const r=indexedDB.open('padloop',1);r.onupgradeneeded=()=>r.result.createObjectStore('pads');r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>res();r.onblocked=()=>res()}catch(e){res()}})}
 function dbGet(k){return new Promise(res=>{if(!db)return res(null);try{const r=db.transaction('pads').objectStore('pads').get(k);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)}catch(e){res(null)}})}
 function savePad(p){if(!db)return;try{db.transaction('pads','readwrite').objectStore('pads').put({name:p.name,steps:p.steps,barsOn:p.barsOn,entry:p.entry,mode:p.mode,bars:p.bars,vol:p.vol,color:p.color,bytes:p.bytes,fileName:p.fileName,demo:p.demo,rev:p.rev,dly:p.dly,comp:p.comp,cut:p.cut||0,rvs:!!p.rvs,eq:p.eq},p.i)}catch(e){}}
-function decode(ab){return new Promise((res,rej)=>{try{const pr=ctx.decodeAudioData(ab.slice(0),res,rej);if(pr&&pr.catch)pr.catch(rej)}catch(e){rej(e)}})}
+function decode(ab){return new Promise((res,rej)=>{let done=false;const ok=b=>{if(done)return;done=true;try{res(toMono(b))}catch(e){res(b)}},bad=e=>{if(done)return;done=true;rej(e||new Error('formato de áudio não suportado neste aparelho'))};
+  try{const pr=ctx.decodeAudioData(ab.slice(0),ok,bad);if(pr&&pr.then)pr.then(ok,bad)}catch(e){bad(e)}})}
+/* a música sai em mono (clique num lado, música no outro), então guardar o áudio em mono não muda o som e usa metade da memória */
+function toMono(b){if(!b||b.numberOfChannels<2)return b;const n=b.length,c=b.numberOfChannels,m=ctx.createBuffer(1,n,b.sampleRate),o=m.getChannelData(0);
+  for(let ch=0;ch<c;ch++){const d=b.getChannelData(ch);for(let k=0;k<n;k++)o[k]+=d[k]}const g=1/c;for(let k=0;k<n;k++)o[k]*=g;return m}
 async function loadPads(){
   await openDB();
   for(const p of pads){try{
@@ -585,7 +589,7 @@ async function loadPads(){
       p.comp=rec.comp||0;p.cut=rec.cut||0;p.rvs=!!rec.rvs;p.eq=rec.eq||{lo:0,mid:0,hi:0};
       if(rec.rev)p.rev=Object.assign({},p.rev,rec.rev);if(rec.dly)p.dly=Object.assign({},p.dly,rec.dly);
       p.gain.gain.value=p.vol;
-      if(p.bytes){try{p.buffer=await decode(p.bytes)}catch(e){p.buffer=null}}
+      if(p.bytes){try{p.buffer=await decode(p.bytes)}catch(e){p.buffer=null;__errs.push('pad '+(p.i+1)+' ('+(p.fileName||'áudio')+'): '+((e&&e.message)||'não abriu'))}}
       else if(p.demo)p.buffer=makeDemo(p.demo);
     }else if(DEMOS[p.i]){p.demo=DEMOS[p.i][0];p.name=DEMOS[p.i][1];
       if(p.i===0){p.mode='steps';p.steps=[1,0,0,0,1,0,0,0,0,0,0,0]}if(p.i===1){p.mode='steps';p.steps=[0,0,1,0,0,0,1,0,0,0,0,0]}p.buffer=makeDemo(p.demo)}
@@ -623,11 +627,11 @@ function scheduleBeat(b,t){
     if(p.state==='playing'&&p.mode==='loop'&&!p.free&&b!==p.startBeat&&(b-p.startBeat)%loopBeats(p)===0)trigger(p,t);
   }
 }
-function scheduler(){while(nextBeatTime<ctx.currentTime+0.12){scheduleBeat(beatIndex,nextBeatTime);nextBeatTime+=60/S.bpm;beatIndex++}
+function scheduler(){while(nextBeatTime<ctx.currentTime+0.12){try{scheduleBeat(beatIndex,nextBeatTime)}catch(e){if(__errs.length<50)__errs.push('tempo: '+e.message)}nextBeatTime+=60/S.bpm;beatIndex++}
   // modo "Na hora": loops ancorados no momento do toque, repetindo a cada X compassos a partir dali
-  for(const p of pads){if(p.free&&p.state==='playing'&&p.mode==='loop'&&p.buffer){
+  for(const p of pads){try{if(p.free&&p.state==='playing'&&p.mode==='loop'&&p.buffer){
     while(p.nextT<ctx.currentTime+0.12){trigger(p,p.nextT);p.nextT+=loopBeats(p)*60/S.bpm}}
-    if(p.free&&p.state==='playing'&&p.mode==='steps'&&p.buffer)freeSteps(p)}}
+    if(p.free&&p.state==='playing'&&p.mode==='steps'&&p.buffer)freeSteps(p)}catch(e){p.free=false;p.state='idle';if(__errs.length<50)__errs.push('pad '+(p.i+1)+': '+e.message)}}}
 // batidas escolhidas no modo "Na hora": o toque vira o tempo 1 do padrão; o compasso e o ciclo contam a partir dali
 function freeSteps(p){
   const n=S.beats*2;
@@ -713,7 +717,8 @@ function tapPad(p,t0){
 /* ---------- draw loop ---------- */
 function buildBars(){const d=$('bars');d.innerHTML='';for(let i=0;i<S.cycle;i++){const x=document.createElement('div');x.className='bar';x.textContent=i+1;d.appendChild(x)}}
 function buildDots(){const d=$('dots');d.innerHTML='';for(let i=0;i<S.beats;i++){const x=document.createElement('div');x.className='dot'+(i===0?' one':'');d.appendChild(x)}}
-function frame(){
+function frame(){requestAnimationFrame(frame);try{frame1()}catch(e){if(__errs.length<50)__errs.push('tela: '+e.message)}}
+function frame1(){
   if(ctx){
     const now=ctx.currentTime;let cur=-1;
     let cb=-1;while(visQ.length&&visQ[0].t<=now){cur=visQ[0].bib;cb=visQ[0].bic;visQ.shift()}
@@ -733,8 +738,7 @@ function frame(){
     });
   }
   if(ctx&&(++diagN%15===0)){const pp=pads.map(p=>(p.i+1)+':'+(p.buffer?p.mode[0]:'-')+(p.state[0])).join(' ');
-    $('diag').textContent='Diagnóstico: áudio '+ctx.state+' · '+ctx.sampleRate+'Hz · saídas '+ctx.destination.maxChannelCount+' · sons disparados '+(window.__hits||0)+' · pads '+pp+(__errs.length?' · ERRO: '+__errs.slice(-2).join(' | '):'')}
-  requestAnimationFrame(frame);
+    $('diag').textContent='Diagnóstico: iOS '+(window.__iosV?String(window.__iosV).replace(/\.(\d)$/,'.$10').replace(/\.0*(\d+)$/,'.$1'):'?')+(document.documentElement.className.indexOf('lite')>=0?' (leve)':'')+' · áudio '+ctx.state+' · '+ctx.sampleRate+'Hz · saídas '+ctx.destination.maxChannelCount+' · sons disparados '+(window.__hits||0)+' · pads '+pp+(__errs.length?' · ERRO: '+__errs.slice(-2).join(' | '):'')}
 }
 let diagN=0;
 
@@ -809,10 +813,9 @@ $('kitImp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
   const n=Math.min(NPADS,kit.pads.length),extra=kit.pads.slice(NPADS).filter(Boolean).length;
   if(!confirm('Importar o kit vai trocar os pads 1 a '+n+', a ambiência e o BPM deste aparelho.'+(extra?' Este aparelho tem só '+NPADS+' pads: os pads '+(NPADS+1)+' a '+kit.pads.length+' do kit ficam de fora.':'')+' Continuar?')){kitMsg('');return}
   if(!db)await openDB();if(!db)throw new Error('armazenamento indisponível');
-  const st=db.transaction('pads','readwrite').objectStore('pads');
-  for(let i=0;i<n;i++){const r=unpackRec(kit.pads[i]);if(r)st.put(r,i);else st.delete(i)}
-  (kit.amb||[]).forEach((r,k)=>{const u=unpackRec(r);if(u&&u.bytes)st.put(u,'amb'+k);else st.delete('amb'+k)});
-  await new Promise((res,rej)=>{st.transaction.oncomplete=res;st.transaction.onerror=()=>rej(st.transaction.error)});
+  const put1=(key,rec)=>new Promise((res,rej)=>{const tx=db.transaction('pads','readwrite'),st=tx.objectStore('pads');if(rec)st.put(rec,key);else st.delete(key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error||new Error('não deu para salvar'));tx.onabort=()=>rej(tx.error||new Error('sem espaço no aparelho'))});
+  for(let i=0;i<n;i++){kitMsg('Importando pad '+(i+1)+' de '+n+'…');await put1(i,unpackRec(kit.pads[i]));kit.pads[i]=null}
+  const am=kit.amb||[];for(let k=0;k<am.length;k++){const u=unpackRec(am[k]);am[k]=null;await put1('amb'+k,u&&u.bytes?u:null)}
   if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','mComp','ambVol','ambFade'])if(k in kit.S)S[k]=kit.S[k];saveS()}
   kitMsg('Kit importado! Recarregando…');setTimeout(()=>location.reload(),600)
 }catch(err){kitMsg('Não deu para importar: '+err.message)}};
