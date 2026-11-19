@@ -1,7 +1,8 @@
 // Pad Loop - funciona offline. Mude VERSION a cada atualização.
-const VERSION = 'padloop-2026-11-19j';
+const VERSION = 'padloop-2026-11-19k';
 const CORE = ['./', './index.html', './ipad.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
-const TONS = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'].map(t => './amb/' + t + '.mp3');
+const PASTAS = ['amb', 'amb-conce', 'amb-paradise']; // uma pasta por som de pad (mesma lista do AMB_SETS no index.html)
+const TONS = PASTAS.flatMap(p => ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'].map(t => './' + p + '/' + t + '.mp3'));
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
 });
@@ -9,7 +10,7 @@ self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     for (const k of await caches.keys()) if (k !== VERSION && k !== 'padloop-tons') await caches.delete(k);
     await self.clients.claim();
-    // baixa os 12 tons em segundo plano para tocar sem internet
+    // baixa os tons em segundo plano para tocar sem internet
     const c = await caches.open('padloop-tons');
     for (const u of TONS) { try { if (!(await c.match(u))) { const r = await fetch(u); if (r.ok) await c.put(u, r); } } catch (_) {} }
   })());
@@ -18,7 +19,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   const url = new URL(req.url);
-  if (url.pathname.includes('/amb/')) {
+  if (/\/amb(-[a-z]+)?\//.test(url.pathname)) {
     // tons: do cache primeiro
     e.respondWith(caches.open('padloop-tons').then(async c => {
       const hit = await c.match(req, {ignoreSearch: true});
