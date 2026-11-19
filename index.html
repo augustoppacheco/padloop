@@ -115,8 +115,33 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .seg button.sel{background:rgba(255,255,255,.12);color:#fff;font-weight:700}
 @media(max-width:520px){.transport{grid-template-columns:1fr}.beatviz{align-items:flex-start;flex-direction:row;justify-content:space-between;width:100%}.opts{grid-template-columns:1fr}#play{flex:1}}
 /* pads */
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px}
-@media(min-width:640px){.grid{grid-template-columns:repeat(4,1fr)}}
+.grid{display:grid;grid-template-columns:1fr 1.18fr 1fr;grid-gap:10px;gap:10px;margin:0 auto 14px;max-width:600px}
+/* pads em roda: compactos para caber 3 por linha */
+.grid .pad{height:118px;padding:10px;border-radius:18px}
+.grid .pad .nm{font-size:14.5px}
+.grid .pad .sub{font-size:10.5px;margin-top:2px}
+.grid .pad .num{top:8px;left:10px}
+.grid .pad .st{top:25px;left:10px;right:8px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grid .pad .gear{top:5px;right:5px;width:32px;height:32px;font-size:14px;border-radius:10px}
+.grid .pad .fx{overflow:hidden;margin-bottom:4px}
+.grid .pad .fx i{font-size:8.5px;padding:1px 4px}
+.grid .pad.empty .nm{font-size:12.5px}
+@media(min-width:520px){.grid .pad{height:140px;padding:12px}.grid .pad .nm{font-size:16px}.grid .pad .sub{font-size:11.5px}}
+/* botão grande de pausa/volta geral, no meio da roda */
+.hub{grid-column:2;grid-row:2;position:relative;width:100%;min-height:118px;padding:6px;border-radius:26px;border:2px solid var(--line2);
+  background:radial-gradient(circle at 50% 35%,#1d2030,#0e1016);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--mut);touch-action:manipulation}
+.hub .ico{position:relative;width:46px;height:46px;display:block;margin-bottom:6px}
+.hub .ico i{position:absolute;top:4px;bottom:4px;width:13px;border-radius:4px;background:currentColor}
+.hub .ico i:first-child{left:7px}.hub .ico i:last-child{right:7px}
+.hub.back .ico i{display:none}
+.hub.back .ico::after{content:"";position:absolute;left:12px;top:3px;border-style:solid;border-width:20px 0 20px 32px;border-color:transparent transparent transparent currentColor}
+.hub .hl{font-size:15px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.hub .hs{font-size:11px;font-weight:700;margin-top:3px;opacity:.85;text-align:center}
+.hub.go{color:#fff;border-color:#ff7a3d;background:radial-gradient(circle at 50% 35%,#4a2418,#1a0f0c);box-shadow:0 0 0 1px #ff7a3d,0 10px 34px rgba(255,122,61,.35)}
+.hub.back{color:#03130a;border-color:#2fd27a;background:linear-gradient(135deg,#2fd27a,#16a35a);box-shadow:0 10px 30px rgba(47,210,122,.35);animation:hubb 1s ease-in-out infinite}
+@keyframes hubb{50%{box-shadow:0 0 0 6px rgba(47,210,122,.25),0 10px 30px rgba(47,210,122,.35)}}
+.hub.press{transform:scale(.96)}
+.lite .hub.go,.lite .hub.back{box-shadow:none}.lite .hub.back{animation:none}
 .pad{--c:#888;position:relative;height:142px;border-radius:var(--rad);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);
   background:linear-gradient(160deg,color-mix(in srgb,var(--c) 26%,#14161c) 0%,#101217 75%);
   padding:12px 13px;text-align:left;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;touch-action:manipulation;transition:transform .08s,box-shadow .2s,border-color .2s}
@@ -286,7 +311,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   </div>
 </div>
 
-<div class="grid" id="grid"></div>
+<div class="grid" id="grid"><button class="hub" id="hub" aria-label="Pausar ou voltar todos os pads"><span class="ico"><i></i><i></i></span><span class="hl">Pausa</span><span class="hs">toque nos pads</span></button></div>
 
 <div class="card">
   <div class="row" style="justify-content:space-between;margin-bottom:12px">
@@ -318,6 +343,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
   • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
   • “Pad entra no: Na hora” (experimental): o pad dispara no instante do toque. Loops ficam repetindo a partir desse ponto; batidas escolhidas seguem os tempos do clique. Tocar de novo para na hora. Volte para “Compasso” para o jeito anterior.<br>
+  • Botão grande do meio (Pausar/Voltar): para de uma vez todos os pads que estão tocando, sem mexer na ambiência nem no clique. Tocando de novo, os mesmos pads voltam juntos, do começo. “Parar pads” para tudo e esquece a pausa. No teclado: Enter ou P.<br>
   • Se nada estiver tocando, tocar um pad já liga o andamento.<br>
   • ⚙ em cada pad: escolher o áudio do seu iPhone (app Arquivos), nome, cor, volume, loop ou “uma vez”.<br>
   • Loop “Automático” calcula quantos compassos o áudio tem pelo BPM. Grave/exporte seus loops no mesmo BPM que vai usar — o app ainda não estica o tempo do áudio.<br>
@@ -714,6 +740,33 @@ function tapPad(p,t0){
   view(p);
 }
 
+/* ---------- pausa geral (botão do meio) ----------
+   Pausar: para na hora todos os pads que estão tocando e guarda quais eram.
+   Voltar: começa de novo exatamente esses pads, todos juntos (no "Na hora" saem no instante do toque). */
+let paused=[],hubSig='';
+function pausable(p){return !!p.buffer&&p.mode!=='once'&&(p.state==='playing'||p.state==='armed')}
+function hubTap(t0){
+  if(!ctx)return;wake();
+  const act=pads.filter(pausable);
+  if(act.length){paused=act.map(p=>p.i);const t=ctx.currentTime;pads.forEach(p=>{if(p.state!=='idle'){stopVoice(p,t);p.state='idle';p.free=false;view(p)}})}
+  else if(paused.length){const list=paused.map(i=>pads[i]).filter(p=>p&&p.buffer&&p.state==='idle');paused=[];
+    if(list.length){if(!running)startTransport();
+      list.forEach(p=>{if(S.quant==='now')startNow(p,t0);else{p.free=false;p.state='armed'}view(p)})}}
+  hubView();
+}
+function hubView(){const h=$('hub');if(!h)return;const n=pads.filter(pausable).length,m=paused.length,mode=n?'go':m?'back':'idle',sig=mode+n+'/'+m;
+  if(sig===hubSig)return;hubSig=sig;h.classList.toggle('go',mode==='go');h.classList.toggle('back',mode==='back');
+  h.querySelector('.hl').textContent=mode==='go'?'Pausar':mode==='back'?'Voltar':'Pausa';
+  h.querySelector('.hs').textContent=mode==='go'?(n===1?'1 pad tocando':n+' pads tocando'):mode==='back'?(m===1?'1 pad pausado':m+' pads pausados'):'toque nos pads'}
+(function(){const h=$('hub');let dn=null;
+  // mesmo cuidado dos pads: não dispara se o dedo arrastou (rolagem)
+  h.addEventListener('pointerdown',e=>{if(performance.now()-lastScroll<250){dn=null;return}dn={x:e.clientX,y:e.clientY,id:e.pointerId,t:ctx?ctx.currentTime:0};h.classList.add('press')});
+  h.addEventListener('pointermove',e=>{if(dn&&e.pointerId===dn.id&&Math.hypot(e.clientX-dn.x,e.clientY-dn.y)>10){dn=null;h.classList.remove('press')}});
+  const cancel=()=>{dn=null;h.classList.remove('press')};h.addEventListener('pointercancel',cancel);h.addEventListener('pointerleave',cancel);
+  h.addEventListener('pointerup',e=>{h.classList.remove('press');if(!dn||e.pointerId!==dn.id)return;const d=dn;dn=null;
+    if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>10||performance.now()-lastScroll<250)return;e.preventDefault();hubTap(d.t)});
+  h.addEventListener('contextmenu',e=>e.preventDefault())})();
+
 /* ---------- draw loop ---------- */
 function buildBars(){const d=$('bars');d.innerHTML='';for(let i=0;i<S.cycle;i++){const x=document.createElement('div');x.className='bar';x.textContent=i+1;d.appendChild(x)}}
 function buildDots(){const d=$('dots');d.innerHTML='';for(let i=0;i<S.beats;i++){const x=document.createElement('div');x.className='dot'+(i===0?' one':'');d.appendChild(x)}}
@@ -737,6 +790,7 @@ function frame1(){
       if(p.el.classList.contains('armed')!==(p.state==='armed')||p.el.classList.contains('playing')!==(p.state==='playing')||p.el.classList.contains('stopping')!==(p.state==='stopping'))view(p);
     });
   }
+  if(ctx)hubView();
   if(ctx&&(++diagN%15===0)){const pp=pads.map(p=>(p.i+1)+':'+(p.buffer?p.mode[0]:'-')+(p.state[0])).join(' ');
     $('diag').textContent='Diagnóstico: iOS '+(window.__iosV?String(window.__iosV).replace(/\.(\d)$/,'.$10').replace(/\.0*(\d+)$/,'.$1'):'?')+(document.documentElement.className.indexOf('lite')>=0?' (leve)':'')+' · áudio '+ctx.state+' · '+ctx.sampleRate+'Hz · saídas '+ctx.destination.maxChannelCount+' · sons disparados '+(window.__hits||0)+' · pads '+pp+(__errs.length?' · ERRO: '+__errs.slice(-2).join(' | '):'')}
 }
@@ -868,7 +922,7 @@ if(!S.sig)S.sig=S.beats===6?'6/8':S.beats+'/4';
 $('sig').value=S.sig;$('sig').onchange=e=>{S.sig=e.target.value;S.beats=parseInt(S.sig,10);saveS();buildDots();regenDemos()};
 $('cycle').value=S.cycle;$('cycle').onchange=e=>{S.cycle=+e.target.value;saveS();buildBars();pads.forEach(view)};
 $('play').onclick=()=>{wake();running?stopTransport():startTransport()};
-$('stopPads').onclick=()=>{pads.forEach(p=>{if(S.quant==='now'&&p.state!=='idle')stopNow(p);else if(p.state==='playing')p.state='stopping';else if(p.state==='armed')p.state='idle';view(p)})};
+$('stopPads').onclick=()=>{paused=[];pads.forEach(p=>{if(S.quant==='now'&&p.state!=='idle')stopNow(p);else if(p.state==='playing')p.state='stopping';else if(p.state==='armed')p.state='idle';view(p)})};
 function clickView(){$('clickTog').classList.toggle('on',S.clickOn);$('clickTog').textContent=S.clickOn?'Clique: ligado':'Clique: desligado'}
 $('clickTog').onclick=()=>{S.clickOn=!S.clickOn;saveS();clickView();applyVols()};
 function segView(id,val){[...$(id).children].forEach(b=>b.classList.toggle('sel',b.dataset.v===val))}
@@ -882,7 +936,7 @@ $('testLR').onclick=()=>{if(!ctx)return;wake();const t=ctx.currentTime+0.05;
   [0,0.3,0.6].forEach(d=>beep(clickBus,t+d,1300,0.08,1));
   [220,277.18,329.63].forEach(f=>beep(musicBus,t+1.1,f,1.0,0.35));};
 document.addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||!$('modal').classList.contains('hidden'))return;
-  if(e.code==='Space'){e.preventDefault();$('play').click()}const n=parseInt(e.key,10);if(n>=1&&n<=NPADS)tapPad(pads[n-1])});
+  if(e.code==='Space'){e.preventDefault();$('play').click()}if(e.key==='Enter'||e.key==='p'||e.key==='P'){e.preventDefault();hubTap(ctx?ctx.currentTime:0);return}const n=parseInt(e.key,10);if(n>=1&&n<=NPADS)tapPad(pads[n-1])});
 
 
 /* ---------- ambiência por tom ---------- */
