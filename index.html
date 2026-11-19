@@ -755,20 +755,21 @@ function hubTap(t0){
     if(list.length){if(!running)startTransport();
       // volta sempre no próximo compasso do clique. O compasso em que pausou é pulado e cada pad
       // continua do compasso seguinte, no mesmo tempo do clique em que estava (o do 1 continua no 1, o do 3 no 3)
-      const tol=0.2*60/S.bpm,shift=barAt(ctx.currentTime+tol+0.03)-B;
+      const shift=barAt(ctx.currentTime+0.4*60/S.bpm+0.03)-B;
       list.forEach(s=>{const p=pads[s.i];try{resumePad(p,s,shift)}catch(e){p.state='idle';p.free=false;if(__errs.length<50)__errs.push('voltar pad '+(p.i+1)+': '+e.message)}view(p)})}}
   hubView();
 }
 /* guarda onde o pad estava no instante da pausa */
 /* início do compasso do clique no instante X ou logo depois */
 function barAt(X){const spb=60/S.bpm;let n=Math.ceil((X-nextBeatTime)/spb-0.001);while((((beatIndex+n)%S.beats)+S.beats)%S.beats!==0)n++;return nextBeatTime+n*spb}
-function snapPad(p,P){const s={i:p.i,P,B:barAt(P),armed:p.state==='armed'};s.E=Math.max(P,s.B-0.2*60/S.bpm); // E: um pouco antes do compasso, pra não perder um toque que foi dado levemente adiantadoif(s.armed)return s;
-  const spb=60/S.bpm,h=spb/2;
+function snapPad(p,P){const spb=60/S.bpm,h=spb/2,B=barAt(P);
+  // E: limite do compasso pausado. Toques até 0,4 tempo antes do compasso seguinte contam como o "1" dele
+  // (um bumbo colocado levemente adiantado no 1 não se perde ao voltar)
+  const s={i:p.i,P,B,E:B-0.4*spb,armed:p.state==='armed'};if(s.armed)return s;
   if(p.mode==='steps'){
-    if(p.free){let T=p.nextT,j=p.stepIdx;while(j>0&&T-h>=P-0.001){T-=h;j--}s.T=T;s.j=j}       // volta os toques já agendados à frente
-    else{const M=S.beats*S.cycle,b0=beatIndex-1,T0=nextBeatTime-spb,k=Math.max(0,Math.min(2,Math.ceil((P-T0)/h-0.001)));
-      s.T=T0+k*h;s.j=((((b0%M)+M)%M)*2+k)%(2*M)}}
-  else{const L=loopBeats(p)*spb;let st=p.lastTrigger;if(p.mode==='loop'&&st>P+0.001&&st-L<=P)st-=L;s.start=st;s.L=L}
+    if(p.free){let T=p.nextT,j=p.stepIdx;while(j>0&&T-h>=s.E-0.001){T-=h;j--}s.T=T;s.j=j}       // volta até o limite (inclui toques já agendados)
+    else{const M=S.beats*S.cycle,n=Math.ceil((s.E-nextBeatTime)/h-0.001),g=beatIndex*2+n;s.T=nextBeatTime+n*h;s.j=((g%(2*M))+2*M)%(2*M)}}
+  else{s.start=p.lastTrigger;s.L=loopBeats(p)*spb}
   return s}
 function startAt(p,when,off){
   const now=ctx.currentTime,src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=p.buffer;src.loop=p.mode==='cont';src.connect(g);g.connect(p.gain);
@@ -780,7 +781,7 @@ function resumePad(p,s,shift){
   if(s.armed){if(S.quant==='now')startNow(p,s.B+shift);else{p.free=false;p.state='armed'}return}
   p.state='playing';p.free=true;p.startBeat=beatIndex;p.hits=[];
   if(p.mode==='steps'){let T=s.T,j=s.j;const h=30/S.bpm;while(T<s.E-0.001){T+=h;j++}p.nextT=T+shift;p.stepIdx=j;freeSteps(p);return}
-  if(p.mode==='loop')while(s.start+s.L<=s.E+0.001)s.start+=s.L;  // repetições que cairiam no compasso pulado
+  if(p.mode==='loop'&&s.L>0){while(s.start>s.E+0.001)s.start-=s.L;while(s.start+s.L<=s.E+0.001)s.start+=s.L}  // a repetição que está tocando no limite do compasso
   const R=s.B+shift,pos=s.B-s.start,D=p.buffer.duration;
   if(pos<0){startAt(p,s.start+shift,0)}                                   // ainda ia começar: começa no ponto certo
   else if(p.mode==='cont'||pos<D-0.005){startAt(p,R,p.mode==='cont'?pos%D:pos)} // continua o áudio do ponto onde parou
