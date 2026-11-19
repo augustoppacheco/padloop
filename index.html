@@ -116,7 +116,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .ov.hidden{display:none}
 #unlock button{font-size:19px;padding:20px 30px;background:linear-gradient(135deg,var(--acc),var(--acc2));color:#140a00;font-weight:800;border:none;border-radius:20px;box-shadow:0 12px 40px rgba(255,140,40,.4)}
 #modal{align-items:flex-end;padding:0}
-.sheet{background:#121419;border:1px solid var(--line2);border-radius:26px 26px 0 0;padding:8px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:520px;max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 -20px 60px rgba(0,0,0,.6)}
+.sheet{background:#121419;border:1px solid var(--line2);border-radius:26px 26px 0 0;padding:8px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:520px;max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;box-shadow:0 -20px 60px rgba(0,0,0,.6)}
 @media(min-width:640px){#modal{align-items:center;padding:20px}.sheet{border-radius:26px}}
 .grab{width:40px;height:5px;border-radius:5px;background:rgba(255,255,255,.2);margin:0 auto 12px}
 .sheet h3{margin:0 0 14px;font-size:20px;font-weight:800;letter-spacing:-.02em}
@@ -143,7 +143,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border:none;border-ra
 .knob{margin-bottom:6px}
 .eqrow{display:flex;justify-content:space-around;gap:8px;margin-top:8px}
 .rk{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
-.rk .dial{width:68px;height:68px;border-radius:50%;position:relative;touch-action:none;cursor:ns-resize;
+.rk .dial{width:68px;height:68px;border-radius:50%;position:relative;touch-action:pan-y;cursor:ew-resize;
   background:conic-gradient(from 225deg,var(--acc) 0 var(--a,0deg),rgba(255,255,255,.1) var(--a,0deg) 270deg,transparent 270deg)}
 .rk .dial::before{content:"";position:absolute;inset:7px;border-radius:50%;background:#1b1d23;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 4px 10px rgba(0,0,0,.4)}
 .rk .dial i{position:absolute;left:50%;top:50%;width:3px;height:22px;margin-left:-1.5px;border-radius:2px;background:#fff;transform-origin:50% 0;transform:rotate(var(--r,180deg))}
@@ -261,7 +261,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Toque num pad: ele pisca e entra certinho no próximo compasso (ou tempo). Toque de novo: ele para no próximo compasso.<br>
   • Efeitos: no ⚙ de cada pad tem Reverb e Delay, sempre presos ao BPM. No reverb você escolhe o tamanho (em tempos); no delay, a velocidade (1/4, 1/8, pontuada, tercina…). Se mudar o BPM, os efeitos acompanham.<br>
   • Ambiência: carregue um arquivo por tom (C a B). Toque num tom e ele entra no próximo compasso, trocando suavemente do tom anterior. Toque no centro (ou no tom ativo) pra parar. “Transição” define se a troca é curta, média ou longa.<br>
-  • Equalizador: no ⚙ de cada pad, 3 botões (Grave, Médio, Agudo). Arraste para cima para aumentar e para baixo para diminuir; dois toques zeram.<br>
+  • Equalizador: no ⚙ de cada pad, botões de Grave, Médio, Agudo, High-pass (tira o grave) e Low-pass (tira o agudo). Arraste para a direita para aumentar e para a esquerda para diminuir; dois toques zeram.<br>
   • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
   • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
   • “Pad entra no: Na hora” (experimental): o pad dispara no instante do toque. Loops ficam repetindo a partir desse ponto; batidas escolhidas seguem os tempos do clique. Tocar de novo para na hora. Volte para “Compasso” para o jeito anterior.<br>
@@ -314,11 +314,15 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
       </div>
     </div>
     <div class="fxb" id="fxEq">
-      <div class="fxh"><div><b>Equalizador</b><small>Arraste o botão para cima ou para baixo · toque duas vezes para zerar</small></div></div>
+      <div class="fxh"><div><b>Equalizador</b><small>Arraste o botão para os lados (direita aumenta) · toque duas vezes para zerar. High-pass tira o grave, Low-pass tira o agudo.</small></div></div>
       <div class="eqrow">
         <div class="rk" data-k="lo"><div class="dial"><i></i></div><b>Grave</b><output></output></div>
         <div class="rk" data-k="mid"><div class="dial"><i></i></div><b>Médio</b><output></output></div>
         <div class="rk" data-k="hi"><div class="dial"><i></i></div><b>Agudo</b><output></output></div>
+      </div>
+      <div class="eqrow" style="margin-top:14px">
+        <div class="rk" data-k="hp" data-min="0" data-max="24"><div class="dial"><i></i></div><b>High-pass</b><output></output></div>
+        <div class="rk" data-k="lp" data-min="0" data-max="24"><div class="dial"><i></i></div><b>Low-pass</b><output></output></div>
       </div>
     </div>
     <div class="fxb" id="fxCut">
@@ -451,18 +455,20 @@ function applyMasterComp(){if(!ctx)return;setComp(mCmp,mMk,S.mComp)}
 function buildFx(p){
   const eqLo=ctx.createBiquadFilter(),eqMid=ctx.createBiquadFilter(),eqHi=ctx.createBiquadFilter();
   eqLo.type='lowshelf';eqLo.frequency.value=200;eqMid.type='peaking';eqMid.frequency.value=1000;eqMid.Q.value=0.8;eqHi.type='highshelf';eqHi.frequency.value=4000;
-  const cp=ctx.createDynamicsCompressor(),mk=ctx.createGain();p.gain.connect(eqLo);eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(cp);cp.connect(mk);mk.connect(musicBus);
+  const eqHp=ctx.createBiquadFilter(),eqLp=ctx.createBiquadFilter();eqHp.type='highpass';eqHp.frequency.value=10;eqHp.Q.value=0.707;eqLp.type='lowpass';eqLp.frequency.value=22000;eqLp.Q.value=0.707;
+  const cp=ctx.createDynamicsCompressor(),mk=ctx.createGain();p.gain.connect(eqLo);eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(eqHp);eqHp.connect(eqLp);eqLp.connect(cp);cp.connect(mk);mk.connect(musicBus);
   const rs=ctx.createGain(),cv=ctx.createConvolver(),rw=ctx.createGain();
   rs.gain.value=0;rw.gain.value=1.6;mk.connect(rs);rs.connect(cv);cv.connect(rw);rw.connect(musicBus);
   const ds=ctx.createGain(),dl=ctx.createDelay(4),fb=ctx.createGain(),lp=ctx.createBiquadFilter(),hp=ctx.createBiquadFilter();
   ds.gain.value=0;lp.type='lowpass';lp.frequency.value=4200;hp.type='highpass';hp.frequency.value=180;
   mk.connect(ds);ds.connect(hp);hp.connect(dl);dl.connect(lp);lp.connect(fb);fb.connect(dl);lp.connect(musicBus);
-  p.fx={eqLo,eqMid,eqHi,cp,mk,rs,cv,ds,dl,fb,irSecs:0};
+  p.fx={eqLo,eqMid,eqHi,eqHp,eqLp,cp,mk,rs,cv,ds,dl,fb,irSecs:0};
 }
 function applyFx(p,rebuildIR){
   if(!ctx||!p.fx)return;const t=ctx.currentTime,f=p.fx;
   setComp(f.cp,f.mk,p.comp||0);
   const eq=p.eq||{};f.eqLo.gain.setTargetAtTime(eq.lo||0,t,0.02);f.eqMid.gain.setTargetAtTime(eq.mid||0,t,0.02);f.eqHi.gain.setTargetAtTime(eq.hi||0,t,0.02);
+  f.eqHp.frequency.setTargetAtTime(eq.hp?hpHz(eq.hp):10,t,0.02);f.eqLp.frequency.setTargetAtTime(eq.lp?lpHz(eq.lp):22000,t,0.02);
   if(p.rev.on){const s=revSecs(p);if(rebuildIR||!f.cv.buffer||Math.abs(f.irSecs-s)>0.01){f.cv.buffer=makeIR(s);f.irSecs=s}}
   f.rs.gain.setTargetAtTime(p.rev.on?p.rev.mix:0,t,0.02);
   f.dl.delayTime.setTargetAtTime(dlySecs(p),t,0.03);
@@ -612,7 +618,7 @@ function view(p){
   ['armed','playing','stopping'].forEach(s=>el.classList.toggle(s,has&&p.state===s));
   
   el.style.setProperty('--c',p.color);
-  el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')+(p.eq&&(p.eq.lo||p.eq.mid||p.eq.hi)?'<i>EQ</i>':'')+(p.cut?'<i>−ATQ</i>':'')+(p.rvs?'<i>◀◀</i>':'')):'';
+  el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')+(p.eq&&(p.eq.lo||p.eq.mid||p.eq.hi)?'<i>EQ</i>':'')+(p.eq&&p.eq.hp?'<i>HP</i>':'')+(p.eq&&p.eq.lp?'<i>LP</i>':'')+(p.cut?'<i>−ATQ</i>':'')+(p.rvs?'<i>◀◀</i>':'')):'';
   el.querySelector('.nm').textContent=has?(p.name||('Pad '+(p.i+1))):'+ Adicionar áudio';
   const en=p.entry==='next'?'':' · entra no '+((+p.entry-1)%S.cycle+1);
   el.querySelector('.sub').textContent=!has?'':(p.mode==='steps'?stepsLabel(p):p.mode==='once'?'Uma vez':p.mode==='cont'?'Contínuo':('Loop · '+(p.bars==='auto'?autoBars(p)+' comp. (auto)':p.bars+' comp.')))+en;
@@ -694,16 +700,24 @@ $('cutOn').onclick=()=>{const p=editing;if(!p)return;if(p.cut){p._cutLast=p.cut;
 $('rvsOn').onclick=()=>{if(!editing)return;editing.rvs=!editing.rvs;fxChanged()};
 /* equalizador: 3 botões giratórios, -12 a +12 dB */
 function eqTxt(v){return v===0?'0 dB':(v>0?'+':'')+v+' dB'}
+function hpHz(v){return 20*Math.pow(100,v/24)}function lpHz(v){return 20000/Math.pow(40,v/24)}
+function hzTxt(h){return h>=1000?(h/1000).toFixed(h>=10000?0:1).replace('.',',')+' kHz':Math.round(h)+' Hz'}
+function knobTxt(k,v){return k==='hp'?(v?hzTxt(hpHz(v)):'Desligado'):k==='lp'?(v?hzTxt(lpHz(v)):'Desligado'):eqTxt(v)}
 function eqView(p){const eq=p.eq||(p.eq={lo:0,mid:0,hi:0});let any=false;
   document.querySelectorAll('#fxEq .rk').forEach(el=>{const v=eq[el.dataset.k]||0;if(v)any=true;const d=el.querySelector('.dial');
-    d.style.setProperty('--r',(180+(v/12)*135)+'deg');d.style.setProperty('--a',((v+12)/24*270)+'deg');el.querySelector('output').textContent=eqTxt(v)});
+    const mn=+(el.dataset.min??-12),mx=+(el.dataset.max??12),fr=(v-mn)/(mx-mn);
+    d.style.setProperty('--r',(45+fr*270)+'deg');d.style.setProperty('--a',(fr*270)+'deg');el.querySelector('output').textContent=knobTxt(el.dataset.k,v)});
   $('fxEq').classList.toggle('on',any)}
-document.querySelectorAll('#fxEq .rk').forEach(el=>{const d=el.querySelector('.dial'),k=el.dataset.k;let y0=0,v0=0,drag=false,lastTap=0;
-  d.addEventListener('pointerdown',e=>{if(!editing)return;e.preventDefault();drag=true;y0=e.clientY;v0=(editing.eq||{})[k]||0;try{d.setPointerCapture(e.pointerId)}catch(_){}
-    const now=Date.now();if(now-lastTap<300){editing.eq=editing.eq||{lo:0,mid:0,hi:0};editing.eq[k]=0;drag=false;fxChanged()}lastTap=now});
-  d.addEventListener('pointermove',e=>{if(!drag||!editing)return;const v=Math.max(-12,Math.min(12,Math.round(v0+(y0-e.clientY)/8)));editing.eq=editing.eq||{lo:0,mid:0,hi:0};
-    if(editing.eq[k]!==v){editing.eq[k]=v;applyFx(editing);eqView(editing);view(editing)}});
-  const end=()=>{if(drag&&editing){drag=false;savePad(editing)}};d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end)});
+document.querySelectorAll('#fxEq .rk').forEach(el=>{const d=el.querySelector('.dial'),k=el.dataset.k,mn=+(el.dataset.min??-12),mx=+(el.dataset.max??12);
+  // gira arrastando para os lados; arrastar para cima/baixo continua rolando a tela
+  let x0=0,y0=0,v0=0,st=0,lastTap=0,pid=null; // st: 0 nada, 1 decidindo, 2 girando
+  const setV=v=>{if(!editing)return;editing.eq=editing.eq||{lo:0,mid:0,hi:0,hp:0,lp:0};if(editing.eq[k]!==v){editing.eq[k]=v;applyFx(editing);eqView(editing);view(editing)}};
+  d.addEventListener('pointerdown',e=>{if(!editing)return;st=1;pid=e.pointerId;x0=e.clientX;y0=e.clientY;v0=(editing.eq||{})[k]||0});
+  d.addEventListener('pointermove',e=>{if(!st||e.pointerId!==pid||!editing)return;const dx=e.clientX-x0,dy=e.clientY-y0;
+    if(st===1){if(Math.abs(dy)>8&&Math.abs(dy)>Math.abs(dx)){st=0;return}if(Math.abs(dx)>8){st=2;x0=e.clientX;try{d.setPointerCapture(pid)}catch(_){}}else return}
+    e.preventDefault();setV(Math.max(mn,Math.min(mx,Math.round(v0+(e.clientX-x0)/7))))});
+  const end=e=>{if(st===2&&editing)savePad(editing);else if(st===1&&e.type==='pointerup'&&editing){const now=Date.now();if(now-lastTap<350){setV(0);savePad(editing);lastTap=0}else lastTap=now}st=0;pid=null};
+  d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end)});
 window.__pl={pads,openEdit};
 $('revOn').onclick=()=>{if(!editing)return;editing.rev.on=!editing.rev.on;fxChanged()};
 $('dlyOn').onclick=()=>{if(!editing)return;editing.dly.on=!editing.dly.on;fxChanged()};
