@@ -278,6 +278,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Toque num pad: ele pisca e entra certinho no próximo compasso (ou tempo). Toque de novo: ele para no próximo compasso.<br>
   • Efeitos: no ⚙ de cada pad tem Reverb e Delay, sempre presos ao BPM. No reverb você escolhe o tamanho (em tempos); no delay, a velocidade (1/4, 1/8, pontuada, tercina…). Se mudar o BPM, os efeitos acompanham.<br>
   • Ambiência: carregue um arquivo por tom (C a B). Toque num tom e ele entra no próximo compasso, trocando suavemente do tom anterior. Toque no centro (ou no tom ativo) pra parar. “Transição” define se a troca é curta, média ou longa.<br>
+  • Kit: “Exportar kit” salva tudo num arquivo; mande por AirDrop e use “Importar kit” no outro aparelho. Do iPhone para o iPad, os 8 pads vão para os 8 primeiros.<br>
   • Equalizador: no ⚙ de cada pad, botões de Grave, Médio, Agudo, High-pass (tira o grave) e Low-pass (tira o agudo). Arraste para a direita para aumentar e para a esquerda para diminuir; dois toques zeram.<br>
   • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
   • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
@@ -290,6 +291,14 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Se não sair som no iPhone, desligue o modo silencioso.<br>
   • No teclado: 1–9, 0 e Q W E R T Y tocam os 16 pads e espaço liga/desliga.</p>
 </details>
+</div>
+
+<div class="card" id="kitCard">
+  <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="lbl">Kit · levar para outro aparelho</span></div>
+  <p class="mut" style="margin:0 0 10px">Salva todos os pads (sons, modos, efeitos, EQ), a ambiência e o BPM num arquivo. Mande por AirDrop e use “Importar” no outro aparelho.</p>
+  <div class="row"><button id="kitExp" style="flex:1">⬆︎ Exportar kit</button><button id="kitImpBtn" style="flex:1">⬇︎ Importar kit</button></div>
+  <input type="file" id="kitImp" style="display:none">
+  <div class="mut" id="kitMsg" style="margin-top:8px"></div>
 </div>
 
 <div class="card mut" id="diag" style="font-size:11px;font-family:ui-monospace,Menlo,monospace">Diagnóstico: áudio não ativado</div>
@@ -735,6 +744,34 @@ document.querySelectorAll('#fxEq .rk').forEach(el=>{const d=el.querySelector('.d
     e.preventDefault();setV(Math.max(mn,Math.min(mx,Math.round(v0+(e.clientX-x0)/7))))});
   const end=e=>{if(st===2&&editing)savePad(editing);else if(st===1&&e.type==='pointerup'&&editing){const now=Date.now();if(now-lastTap<350){setV(0);savePad(editing);lastTap=0}else lastTap=now}st=0;pid=null};
   d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end)});
+/* ---------- kit: exportar / importar ---------- */
+function ab2b64(ab){const u=new Uint8Array(ab);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+function b642ab(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer}
+function packRec(r){if(!r)return null;const o=Object.assign({},r);if(o.bytes)o.bytes=ab2b64(o.bytes);return o}
+function unpackRec(r){if(!r)return null;const o=Object.assign({},r);if(o.bytes)o.bytes=b642ab(o.bytes);return o}
+function kitMsg(t){$('kitMsg').textContent=t}
+$('kitExp').onclick=async()=>{try{kitMsg('Preparando o kit…');if(!db)await openDB();
+  const kit={padloop:1,from:NPADS===16?'ipad':'iphone',date:new Date().toISOString(),S:Object.assign({},S),pads:[],amb:[]};
+  for(let i=0;i<NPADS;i++)kit.pads.push(packRec(await dbGet(i)));
+  for(let k=0;k<12;k++)kit.amb.push(packRec(await dbGet('amb'+k)));
+  const d=new Date(),nm='PadLoop-'+(NPADS===16?'iPad':'iPhone')+'-'+d.toISOString().slice(0,10)+'.padloop';
+  const file=new File([JSON.stringify(kit)],nm,{type:'application/octet-stream'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:'Kit Pad Loop'});kitMsg('Kit enviado: '+nm);return}catch(e){if(e&&e.name==='AbortError'){kitMsg('');return}}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=nm;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);kitMsg('Kit salvo: '+nm+' ('+(file.size/1048576).toFixed(1)+' MB)')
+}catch(e){kitMsg('Não deu para exportar: '+e.message)}};
+$('kitImpBtn').onclick=()=>$('kitImp').click();
+$('kitImp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{kitMsg('Lendo o kit…');
+  const kit=JSON.parse(await f.text());if(!kit||kit.padloop!==1||!Array.isArray(kit.pads))throw new Error('esse arquivo não é um kit do Pad Loop');
+  const n=Math.min(NPADS,kit.pads.length),extra=kit.pads.slice(NPADS).filter(Boolean).length;
+  if(!confirm('Importar o kit vai trocar os pads 1 a '+n+', a ambiência e o BPM deste aparelho.'+(extra?' Este aparelho tem só '+NPADS+' pads: os pads '+(NPADS+1)+' a '+kit.pads.length+' do kit ficam de fora.':'')+' Continuar?')){kitMsg('');return}
+  if(!db)await openDB();if(!db)throw new Error('armazenamento indisponível');
+  const st=db.transaction('pads','readwrite').objectStore('pads');
+  for(let i=0;i<n;i++){const r=unpackRec(kit.pads[i]);if(r)st.put(r,i);else st.delete(i)}
+  (kit.amb||[]).forEach((r,k)=>{const u=unpackRec(r);if(u&&u.bytes)st.put(u,'amb'+k);else st.delete('amb'+k)});
+  await new Promise((res,rej)=>{st.transaction.oncomplete=res;st.transaction.onerror=()=>rej(st.transaction.error)});
+  if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','mComp','ambVol','ambFade'])if(k in kit.S)S[k]=kit.S[k];saveS()}
+  kitMsg('Kit importado! Recarregando…');setTimeout(()=>location.reload(),600)
+}catch(err){kitMsg('Não deu para importar: '+err.message)}};
 window.__pl={pads,openEdit};
 $('revOn').onclick=()=>{if(!editing)return;editing.rev.on=!editing.rev.on;fxChanged()};
 $('dlyOn').onclick=()=>{if(!editing)return;editing.dly.on=!editing.dly.on;fxChanged()};
