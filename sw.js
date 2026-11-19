@@ -1,5 +1,5 @@
 // Pad Loop - funciona offline. Mude VERSION a cada atualização.
-const VERSION = 'padloop-2026-11-19f';
+const VERSION = 'padloop-2026-11-19g';
 const CORE = ['./', './index.html', './ipad.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const TONS = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'].map(t => './amb/' + t + '.mp3');
 self.addEventListener('install', e => {
