@@ -1,5 +1,5 @@
 // Pad Loop - funciona offline. Mude VERSION a cada atualização.
-const VERSION = 'padloop-2026-11-19j';
+const VERSION = 'padloop-2026-11-19k';
 const CORE = ['./', './index.html', './ipad.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const PASTAS = ['amb', 'amb-conce', 'amb-paradise']; // uma pasta por som de pad (mesma lista do AMB_SETS no index.html)
 const TONS = PASTAS.flatMap(p => ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'].map(t => './' + p + '/' + t + '.mp3'));
