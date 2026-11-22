@@ -347,7 +347,6 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   </div>
   <div class="vol"><label>Clique</label><input type="range" id="clickVol" min="0" max="1" step="0.01"></div>
   <div class="vol"><label>Música</label><input type="range" id="musicVol" min="0" max="1" step="0.01"></div>
-  <div class="knob" style="margin-top:14px"><div class="kh"><span>Compressor geral (música, não afeta o clique)</span><output id="mCompO"></output></div><input type="range" id="mComp" min="0" max="1" step="0.01"></div>
   <p class="mut" id="routeInfo" style="margin:10px 0 0"></p>
   <p class="mut" style="margin:6px 0 0">Bluetooth/AirPods: o app passa o som sozinho para a saída nova. Se ficar mudo ou sair no alto-falante, toque em <b>Reconectar som</b>. Fone Bluetooth normal: use <b>Tudo junto</b>.</p>
 </div>
@@ -361,13 +360,10 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   • Modo Batidas escolhidas: no ⚙ você marca em quais tempos o som bate (1, 2, 3, 4 e os contratempos “e”) e em quais compassos do ciclo. Use um áudio de uma batida só (um bumbo, uma caixa).<br>
   • Modo Contínuo: o áudio fica repetindo inteiro, sem cortar, até você parar — ideal pra pad ambiente.<br>
   • Toque num pad: ele pisca e entra certinho no próximo compasso (ou tempo). Toque de novo: ele para no próximo compasso.<br>
-  • Efeitos: no ⚙ de cada pad tem Reverb e Delay, sempre presos ao BPM. No reverb você escolhe o tamanho (em tempos); no delay, a velocidade (1/4, 1/8, pontuada, tercina…). Se mudar o BPM, os efeitos acompanham.<br>
   • Ambiência: carregue um arquivo por tom (C a B). Toque num tom e ele entra no próximo compasso, trocando suavemente do tom anterior. Toque no centro (ou no tom ativo) pra parar. “Transição” define se a troca é curta, média ou longa.<br>
   • Kit: “Exportar kit” salva tudo num arquivo; mande por AirDrop e use “Importar kit” no outro aparelho. Do iPhone para o iPad, os 8 pads vão para os 8 primeiros.<br>
   • Equalizador: no ⚙ de cada pad, botões de Grave, Médio, Agudo, High-pass (tira o grave) e Low-pass (tira o agudo). Arraste para a direita para aumentar e para a esquerda para diminuir; dois toques zeram.<br>
-  • Tirar ataque e Reverso: no ⚙ de cada pad. “Tirar ataque” some com o começo do som (a pancada) e ele entra crescendo; “Reverso” toca o áudio de trás para frente. Dá para usar os dois juntos.<br>
-  • Compressor: no ⚙ de cada pad e um geral na Saída de áudio (só na música, o clique fica de fora).<br>
-  • “Pad entra no: Na hora” (experimental): o pad dispara no instante do toque. Loops ficam repetindo a partir desse ponto; batidas escolhidas seguem os tempos do clique. Tocar de novo para na hora. Volte para “Compasso” para o jeito anterior.<br>
+  • “Pad entra no: Na hora”: o pad dispara no toque. Com o clique rodando, se você tocar perto de um tempo, o pad entra exatamente nesse tempo (já descontando o atraso do Bluetooth/AirPods). Se o clique estiver parado, clique e pad começam juntos. Tocar de novo para na hora.<br>
   • Botão grande do meio (Pausar/Voltar): para de uma vez todos os pads que estão tocando, sem mexer na ambiência nem no clique. Tocando de novo, os mesmos pads voltam de onde pararam (a partir do compasso seguinte ao da pausa). Eles voltam sempre no próximo compasso, cada um no mesmo tempo do clique em que estava (o que estava no 1 continua no 1). “Parar pads” para tudo e esquece a pausa. No teclado: Enter ou P.<br>
   • Se nada estiver tocando, tocar um pad já liga o andamento.<br>
   • ⚙ em cada pad: escolher o áudio do seu iPhone (app Arquivos), nome, cor, volume, loop ou “uma vez”.<br>
@@ -381,7 +377,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
 
 <div class="card" id="kitCard">
   <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="lbl">Kit · levar para outro aparelho</span></div>
-  <p class="mut" style="margin:0 0 10px">Salva todos os pads (sons, modos, efeitos, EQ), a ambiência e o BPM num arquivo. Mande por AirDrop e use “Importar” no outro aparelho.</p>
+  <p class="mut" style="margin:0 0 10px">Salva todos os pads (sons, modos, EQ), a ambiência e o BPM num arquivo. Mande por AirDrop e use “Importar” no outro aparelho.</p>
   <div class="row"><button id="kitExp" style="flex:1">⬆︎ Exportar kit</button><button id="kitImpBtn" style="flex:1">⬇︎ Importar kit</button></div>
   <input type="file" id="kitImp" style="display:none">
   <div class="mut" id="kitMsg" style="margin-top:8px"></div>
@@ -409,22 +405,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
     <label class="f" id="mBarsWrap">Duração do loop<select id="mBars"><option value="auto">Automático</option><option value="1">1 compasso</option><option value="2">2 compassos</option><option value="4">4 compassos</option><option value="8">8 compassos</option><option value="16">16 compassos</option></select></label>
   </div>
   <div class="sec">
-    <span class="lbl">Efeitos · sincronizados ao BPM</span>
-    <div class="fxb" id="fxRev">
-      <div class="fxh"><div><b>Reverb</b><small>Ambiência que acompanha o andamento</small></div><button class="sw" id="revOn" aria-label="Ligar reverb"></button></div>
-      <div class="fxbody" id="revBody">
-        <div class="knob"><div class="kh"><span>Tamanho</span><output id="revSizeO"></output></div><input type="range" id="revSize" min="0" max="5" step="1"></div>
-        <div class="knob"><div class="kh"><span>Quantidade</span><output id="revMixO"></output></div><input type="range" id="revMix" min="0" max="1" step="0.01"></div>
-      </div>
-    </div>
-    <div class="fxb" id="fxDly">
-      <div class="fxh"><div><b>Delay</b><small>Repetições no tempo do clique</small></div><button class="sw" id="dlyOn" aria-label="Ligar delay"></button></div>
-      <div class="fxbody" id="dlyBody">
-        <div class="knob"><div class="kh"><span>Velocidade</span><output id="dlyDivO"></output></div><input type="range" id="dlyDiv" min="0" max="6" step="1"></div>
-        <div class="knob"><div class="kh"><span>Repetições</span><output id="dlyFbO"></output></div><input type="range" id="dlyFb" min="0" max="0.85" step="0.01"></div>
-        <div class="knob"><div class="kh"><span>Quantidade</span><output id="dlyMixO"></output></div><input type="range" id="dlyMix" min="0" max="1" step="0.01"></div>
-      </div>
-    </div>
+    <span class="lbl">Equalizador e cortes</span>
     <div class="fxb" id="fxEq">
       <div class="fxh"><div><b>Equalizador</b><small>Arraste o botão para os lados (direita aumenta) · toque duas vezes para zerar. High-pass tira o grave, Low-pass tira o agudo.</small></div></div>
       <div class="eqrow">
@@ -436,18 +417,6 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
         <div class="rk" data-k="hp" data-min="0" data-max="24"><div class="dial"><i></i></div><b>High-pass</b><output></output></div>
         <div class="rk" data-k="lp" data-min="0" data-max="24"><div class="dial"><i></i></div><b>Low-pass</b><output></output></div>
       </div>
-    </div>
-    <div class="fxb" id="fxCut">
-      <div class="fxh"><div><b>Tirar ataque</b><small>Some com o começo do som e deixa só o resto</small></div><button class="sw" id="cutOn" aria-label="Tirar ataque"></button></div>
-      <div class="fxbody" id="cutBody"><div class="knob"><div class="kh" style="margin-bottom:6px"><span>Quanto tirar</span></div>
-        <div class="seg" id="cutLen"><button data-v="1">Pouco</button><button data-v="2">Médio</button><button data-v="3">Muito</button></div></div></div>
-    </div>
-    <div class="fxb" id="fxRvs">
-      <div class="fxh"><div><b>Reverso</b><small>Toca o áudio de trás para frente</small></div><button class="sw" id="rvsOn" aria-label="Reverso"></button></div>
-    </div>
-    <div class="fxb" id="fxCmp">
-      <div class="fxh"><div><b>Compressor</b><small>Segura os picos e deixa o som mais firme</small></div></div>
-      <div class="fxbody"><div class="knob"><div class="kh"><span>Quantidade</span><output id="cmpO"></output></div><input type="range" id="cmpAmt" min="0" max="1" step="0.01"></div></div>
     </div>
   </div>
   <div class="sec">
@@ -467,28 +436,15 @@ window.__errs=[];window.addEventListener('error',e=>{__errs.push(e.message)});wi
 const NPADS=16;
 const COLORS=['#ff5d73','#ffb020','#4fd18b','#4fc3f7','#a78bfa','#f472b6','#facc15','#94a3b8'];
 const DEMOS=[['kick1','Bumbo'],['snare1','Caixa'],['hat','Chimbal'],['pad','Pad ambiente'],['bass','Baixo']];
-const S={cycle:4,bpm:90,beats:4,quant:'now',route:'clickL',clickOn:true,clickVol:0.8,musicVol:0.9,mComp:0.25,ambVol:0.8,ambFade:2,ambSet:0};
+const S={cycle:4,bpm:90,beats:4,quant:'now',route:'clickL',clickOn:true,clickVol:0.8,musicVol:0.9,ambVol:0.8,ambFade:2,ambSet:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem('padloop_ipad_s')||'{}'))}catch(e){}
 if(S.qv!==2){S.quant='now';S.qv=2}  // "Na hora" virou o padrão
 function saveS(){try{localStorage.setItem('padloop_ipad_s',JSON.stringify(S))}catch(e){}}
 
-const pads=Array.from({length:NPADS},(_,i)=>({i,name:'',mode:'loop',bars:'auto',entry:'next',steps:[1,0,0,0,1,0,0,0,0,0,0,0],barsOn:[1,1,1,1,1,1,1,1],vol:0.9,color:COLORS[i%COLORS.length],comp:0,rev:{on:false,size:2,mix:0.35},dly:{on:false,div:4,fb:0.35,mix:0.3},
+const pads=Array.from({length:NPADS},(_,i)=>({i,name:'',mode:'loop',bars:'auto',entry:'next',steps:[1,0,0,0,1,0,0,0,0,0,0,0],barsOn:[1,1,1,1,1,1,1,1],vol:0.9,color:COLORS[i%COLORS.length],
   buffer:null,bytes:null,fileName:'',demo:null,state:'idle',startBeat:0,lastTrigger:0,voice:null,endTime:0,gain:null,el:null}));
 
-/* ---------- reverso e "tirar ataque": processa o áudio do pad ---------- */
-const CUT_LEN={1:0.08,2:0.2,3:0.45};
-function procBuf(p){const raw=p._raw;if(!raw)return raw;const cut=p.cut||0,rv=!!p.rvs;if(!cut&&!rv)return raw;
-  const key=cut+'|'+rv;if(p._pc&&p._pc.raw===raw&&p._pc.key===key)return p._pc.buf;
-  const n=raw.length,out=ctx.createBuffer(raw.numberOfChannels,n,raw.sampleRate);
-  const chans=[];for(let c=0;c<raw.numberOfChannels;c++){const a=raw.getChannelData(c),b=out.getChannelData(c);if(rv){for(let k=0;k<n;k++)b[k]=a[n-1-k]}else b.set(a);chans.push(b)}
-  if(cut){let pk=0;for(const b of chans)for(let k=0;k<n;k++){const v=Math.abs(b[k]);if(v>pk)pk=v}
-    let on=0;const th=pk*0.08;outer:for(let k=0;k<n;k++)for(const b of chans)if(Math.abs(b[k])>th){on=k;break outer}
-    const L=Math.max(1,Math.floor(CUT_LEN[cut]*raw.sampleRate));
-    for(const b of chans){for(let k=0;k<on;k++)b[k]=0;for(let k=0;k<L&&on+k<n;k++){const x=k/L;b[on+k]*=x*x*x}}}
-  p._pc={raw,key,buf:out};return out}
-pads.forEach(p=>{p._raw=p.buffer;delete p.buffer;Object.defineProperty(p,'buffer',{get(){return procBuf(this)},set(v){this._raw=v;this._pc=null},enumerable:false,configurable:true})});
-
-let ctx=null,merger,clickBus,musicBus,cL,cR,mL,mR,mCmp,mMk,mVolN,ambBus;
+let ctx=null,merger,clickBus,musicBus,cL,cR,mL,mR,mVolN,ambBus;
 let lastBarTime=0,running=false,timer=null,nextBeatTime=0,beatIndex=0,visQ=[],wakeLock=null;
 const $=id=>document.getElementById(id);
 
@@ -504,13 +460,13 @@ function initAudio(){
   merger=ctx.createChannelMerger(2);merger.connect(ctx.destination);
   clickBus=mono();musicBus=mono();cL=mono();cR=mono();mL=mono();mR=mono();
   clickBus.connect(cL);clickBus.connect(cR);
-  mCmp=ctx.createDynamicsCompressor();mMk=ctx.createGain();mVolN=mono();musicBus.connect(mCmp);mCmp.connect(mMk);mMk.connect(mVolN);mVolN.connect(mL);mVolN.connect(mR);
+  mVolN=mono();musicBus.connect(mVolN);mVolN.connect(mL);mVolN.connect(mR);
   ambBus=ctx.createGain();ambBus.connect(musicBus);
   cL.connect(merger,0,0);mL.connect(merger,0,0);cR.connect(merger,0,1);mR.connect(merger,0,1);
   pads.forEach(p=>{p.gain=ctx.createGain();p.gain.gain.value=p.vol;buildFx(p)});
   const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0);
   ctx.resume();
-  applyRoute();applyVols();applyMasterComp();
+  applyRoute();applyVols();
 }
 /* iOS: Web Audio fica mudo com a chave de silencioso ligada. Tocar um <audio> silencioso em loop
    coloca o iPhone no modo "reprodução", que ignora a chave (igual a um app de música). */
@@ -539,7 +495,7 @@ function rebuildAudio(){
     const old=ctx;ctx=null;old.onstatechange=null;try{old.close()}catch(e){}
     if(silentEl){try{silentEl.pause()}catch(e){}}
     initAudio();
-    pads.forEach(p=>{p.gain.gain.value=p.vol;applyFx(p,true)});
+    pads.forEach(p=>{p.gain.gain.value=p.vol;applyFx(p)});
     if(ak!=null)ambGo(ak,ctx.currentTime+0.05);
     if(was)startTransport();
     pads.forEach(view);ambView();window.__reconn=(window.__reconn||0)+1;
@@ -568,62 +524,23 @@ function beep(bus,t,freq,dur,vol){
 }
 
 
-/* ---------- effects (reverb + delay, synced to BPM) ---------- */
-const REV_SIZES=[0.5,1,2,4,8,16];               // in beats
-const DLY_DIVS=[{b:2,l:'1/2',s:'1/2'},{b:1.5,l:'1/4 pontuada',s:'1/4.'},{b:1,l:'1/4 · 1 tempo',s:'1/4'},{b:0.75,l:'1/8 pontuada',s:'1/8.'},{b:0.5,l:'1/8 · contratempo',s:'1/8'},{b:1/3,l:'1/8 tercina',s:'1/8T'},{b:0.25,l:'1/16',s:'1/16'}];
-function revSecs(p){return Math.min(14,REV_SIZES[p.rev.size]*60/S.bpm)}
-function dlySecs(p){return DLY_DIVS[p.dly.div].b*60/S.bpm}
-function revLabel(p){const b=REV_SIZES[p.rev.size];return(b===0.5?'½ tempo':b===1?'1 tempo':b+' tempos')+' · '+revSecs(p).toFixed(1).replace('.',',')+' s'}
-function dlyLabel(p){return DLY_DIVS[p.dly.div].l+' · '+Math.round(dlySecs(p)*1000)+' ms'}
-function makeIR(secs){
-  const sr=ctx.sampleRate,tail=Math.max(0.15,secs),len=Math.round((tail+0.05)*sr),buf=ctx.createBuffer(2,len,sr);
-  const pre=Math.round(0.012*sr);
-  for(let c=0;c<2;c++){const d=buf.getChannelData(c);let lp=0;
-    for(let k=pre;k<len;k++){const t=(k-pre)/sr,env=Math.exp(-6.9*t/tail),fade=Math.min(1,(len-k)/(0.04*sr));
-      const n=Math.random()*2-1;lp+= (n-lp)*(0.25+0.6*Math.exp(-3*t/tail));d[k]=lp*env*fade}}
-  return buf;
-}
-/* compressor: amount 0..1 -> threshold/ratio + ganho de compensação */
-function setComp(c,mk,amt){if(!c)return;const t=ctx.currentTime,a=Math.max(0,Math.min(1,amt)),thr=-a*36,ratio=1+a*9;
-  c.threshold.setTargetAtTime(thr,t,0.02);c.ratio.setTargetAtTime(ratio,t,0.02);c.knee.setTargetAtTime(a>0?8:0,t,0.02);
-  c.attack.setTargetAtTime(0.004,t,0.02);c.release.setTargetAtTime(0.18,t,0.02);
-  mk.gain.setTargetAtTime(Math.pow(10,(-thr*(1-1/ratio)*0.45)/20),t,0.03)}
-function compLabel(a){return a<0.01?'Desligado':(a<0.35?'Leve':a<0.7?'Médio':'Forte')+' · '+Math.round(a*100)+'%'}
-function applyMasterComp(){if(!ctx)return;setComp(mCmp,mMk,S.mComp)}
+/* ---------- equalizador por pad (grave, médio, agudo + cortes high-pass / low-pass) ---------- */
 function buildFx(p){
   const eqLo=ctx.createBiquadFilter(),eqMid=ctx.createBiquadFilter(),eqHi=ctx.createBiquadFilter();
   eqLo.type='lowshelf';eqLo.frequency.value=200;eqMid.type='peaking';eqMid.frequency.value=1000;eqMid.Q.value=0.8;eqHi.type='highshelf';eqHi.frequency.value=4000;
   const eqHp=ctx.createBiquadFilter(),eqLp=ctx.createBiquadFilter();eqHp.type='highpass';eqHp.frequency.value=10;eqHp.Q.value=0.707;eqLp.type='lowpass';eqLp.frequency.value=22000;eqLp.Q.value=0.707;
-  const cp=ctx.createDynamicsCompressor(),mk=ctx.createGain();eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(eqHp);eqHp.connect(eqLp);
-  const rs=ctx.createGain(),cv=ctx.createConvolver(),rw=ctx.createGain();
-  rs.gain.value=0;rw.gain.value=1.6;rs.connect(cv);cv.connect(rw);
-  const ds=ctx.createGain(),dl=ctx.createDelay(4),fb=ctx.createGain(),lp=ctx.createBiquadFilter(),hp=ctx.createBiquadFilter();
-  ds.gain.value=0;lp.type='lowpass';lp.frequency.value=4200;hp.type='highpass';hp.frequency.value=180;
-  ds.connect(hp);hp.connect(dl);dl.connect(lp);lp.connect(fb);fb.connect(dl);
-  p.fx={eqLo,eqMid,eqHi,eqHp,eqLp,cp,mk,rs,cv,rw,ds,dl,fb,lp,irSecs:0,sig:'',revOut:false,dlyOut:false};
+  eqLo.connect(eqMid);eqMid.connect(eqHi);eqHi.connect(eqHp);eqHp.connect(eqLp);eqLp.connect(musicBus);
+  p.fx={eqLo,eqMid,eqHi,eqHp,eqLp,sig:''};
   wireFx(p);
 }
-/* liga só o que o pad usa: EQ, compressor, reverb e delay desligados não gastam processamento (importante em aparelhos antigos) */
-function wireFx(p){const f=p.fx;if(!f)return;const eq=p.eq||{},uEq=!!(eq.lo||eq.mid||eq.hi||eq.hp||eq.lp),uCp=(p.comp||0)>0.01,uRev=!!p.rev.on,uDly=!!p.dly.on;
-  const sig=[uEq,uCp,uRev,uDly].map(Number).join('');if(f.sig===sig)return;f.sig=sig;
-  [p.gain,f.eqLp,f.cp,f.mk].forEach(n=>{try{n.disconnect()}catch(e){}});
-  const tail=uCp?f.cp:f.mk;if(uEq){p.gain.connect(f.eqLo);f.eqLp.connect(tail)}else p.gain.connect(tail);if(uCp)f.cp.connect(f.mk);
-  f.mk.connect(musicBus);if(uRev)f.mk.connect(f.rs);if(uDly)f.mk.connect(f.ds);
-  if(uRev&&!f.revOut){f.rw.connect(musicBus);f.revOut=true}if(uDly&&!f.dlyOut){f.lp.connect(musicBus);f.dlyOut=true}
-  clearTimeout(f.offT);if((!uRev&&f.revOut)||(!uDly&&f.dlyOut))f.offT=setTimeout(()=>{if(!p.rev.on&&f.revOut){try{f.rw.disconnect()}catch(e){}f.revOut=false}if(!p.dly.on&&f.dlyOut){try{f.lp.disconnect()}catch(e){}try{f.lp.connect(f.fb)}catch(e){}f.dlyOut=false}},6000)}
-function applyFx(p,rebuildIR){
+/* o EQ só entra no caminho do som quando algum botão está mexido: zerado, o pad vai direto pra saída */
+function wireFx(p){const f=p.fx;if(!f)return;const eq=p.eq||{},uEq=!!(eq.lo||eq.mid||eq.hi||eq.hp||eq.lp),sig=uEq?'eq':'-';if(f.sig===sig)return;f.sig=sig;
+  try{p.gain.disconnect()}catch(e){}p.gain.connect(uEq?f.eqLo:musicBus)}
+function applyFx(p){
   if(!ctx||!p.fx)return;const t=ctx.currentTime,f=p.fx;wireFx(p);
-  setComp(f.cp,f.mk,p.comp||0);
   const eq=p.eq||{};f.eqLo.gain.setTargetAtTime(eq.lo||0,t,0.02);f.eqMid.gain.setTargetAtTime(eq.mid||0,t,0.02);f.eqHi.gain.setTargetAtTime(eq.hi||0,t,0.02);
   f.eqHp.frequency.setTargetAtTime(eq.hp?hpHz(eq.hp):10,t,0.02);f.eqLp.frequency.setTargetAtTime(eq.lp?lpHz(eq.lp):22000,t,0.02);
-  if(p.rev.on){const s=revSecs(p);if(rebuildIR||!f.cv.buffer||Math.abs(f.irSecs-s)>0.01){f.cv.buffer=makeIR(s);f.irSecs=s}}
-  f.rs.gain.setTargetAtTime(p.rev.on?p.rev.mix:0,t,0.02);
-  f.dl.delayTime.setTargetAtTime(dlySecs(p),t,0.03);
-  f.fb.gain.setTargetAtTime(p.dly.on?p.dly.fb:0,t,0.02);
-  f.ds.gain.setTargetAtTime(p.dly.on?p.dly.mix:0,t,0.02);
 }
-let fxTimer=null;
-function retimeFx(){clearTimeout(fxTimer);fxTimer=setTimeout(()=>pads.forEach(p=>applyFx(p)),120)}
 
 /* ---------- demo sounds (generated) ---------- */
 function makeDemo(kind){
@@ -652,7 +569,7 @@ function regenDemos(){clearTimeout(demoTimer);demoTimer=setTimeout(()=>{if(!ctx)
 let db=null;
 function openDB(){return new Promise(res=>{setTimeout(res,8000);try{const r=indexedDB.open('padloop_ipad',1);r.onupgradeneeded=()=>r.result.createObjectStore('pads');r.onsuccess=()=>{db=r.result;res()};r.onerror=()=>res();r.onblocked=()=>res()}catch(e){res()}})}
 function dbGet(k){return new Promise(res=>{if(!db)return res(null);try{const r=db.transaction('pads').objectStore('pads').get(k);r.onsuccess=()=>res(r.result||null);r.onerror=()=>res(null)}catch(e){res(null)}})}
-function savePad(p){if(!db)return;try{db.transaction('pads','readwrite').objectStore('pads').put({name:p.name,steps:p.steps,barsOn:p.barsOn,entry:p.entry,mode:p.mode,bars:p.bars,vol:p.vol,color:p.color,bytes:p.bytes,fileName:p.fileName,demo:p.demo,rev:p.rev,dly:p.dly,comp:p.comp,cut:p.cut||0,rvs:!!p.rvs,eq:p.eq},p.i)}catch(e){}}
+function savePad(p){if(!db)return;try{db.transaction('pads','readwrite').objectStore('pads').put({name:p.name,steps:p.steps,barsOn:p.barsOn,entry:p.entry,mode:p.mode,bars:p.bars,vol:p.vol,color:p.color,bytes:p.bytes,fileName:p.fileName,demo:p.demo,eq:p.eq},p.i)}catch(e){}}
 function decode(ab){return new Promise((res,rej)=>{let done=false;const ok=b=>{if(done)return;done=true;try{res(toMono(b))}catch(e){res(b)}},bad=e=>{if(done)return;done=true;rej(e||new Error('formato de áudio não suportado neste aparelho'))};
   try{const pr=ctx.decodeAudioData(ab.slice(0),ok,bad);if(pr&&pr.then)pr.then(ok,bad)}catch(e){bad(e)}})}
 /* a música sai em mono (clique num lado, música no outro), então guardar o áudio em mono não muda o som e usa metade da memória */
@@ -663,8 +580,7 @@ async function loadPads(){
   for(const p of pads){try{
     const rec=await dbGet(p.i);
     if(rec){Object.assign(p,{steps:rec.steps||p.steps,barsOn:rec.barsOn||p.barsOn,entry:rec.entry||'next',name:rec.name||'',mode:rec.mode||'loop',bars:rec.bars||'auto',vol:rec.vol!=null?rec.vol:0.9,color:rec.color||COLORS[p.i%COLORS.length],bytes:rec.bytes||null,fileName:rec.fileName||'',demo:rec.demo||null});
-      p.comp=rec.comp||0;p.cut=rec.cut||0;p.rvs=!!rec.rvs;p.eq=rec.eq||{lo:0,mid:0,hi:0};
-      if(rec.rev)p.rev=Object.assign({},p.rev,rec.rev);if(rec.dly)p.dly=Object.assign({},p.dly,rec.dly);
+      p.eq=rec.eq||{lo:0,mid:0,hi:0};
       p.gain.gain.value=p.vol;
       if(p.bytes){try{p.buffer=await decode(p.bytes)}catch(e){p.buffer=null;__errs.push('pad '+(p.i+1)+' ('+(p.fileName||'áudio')+'): '+((e&&e.message)||'não abriu'))}}
       else if(p.demo)p.buffer=makeDemo(p.demo);
@@ -713,18 +629,32 @@ function scheduler(){while(nextBeatTime<ctx.currentTime+0.12){try{scheduleBeat(b
 function freeSteps(p){
   const n=S.beats*2;
   while(p.nextT<ctx.currentTime+0.12){const j=p.stepIdx,pos=j%n,bar=Math.floor(j/n)%S.cycle;
-    if(p.steps[pos]&&p.barsOn[bar])trigger(p,p.nextT);
+    if(p.steps[pos]&&p.barsOn[bar]&&Math.abs(p.nextT-p.lastTrigger)>0.08)trigger(p,p.nextT);
     p.stepIdx++;p.nextT+=30/S.bpm}}
-function startNow(p,t0){
-  // ancora no instante em que o dedo encostou (no máx. 0,4 s atrás)
-  const now=ctx.currentTime,t=(t0&&t0<=now&&now-t0<0.4)?t0:now+0.01;p.free=true;p.state='playing';p.startBeat=beatIndex;
-  if(p.mode==='steps'){p.nextT=t;p.stepIdx=0;freeSteps(p)}
+/* ---------- toque no tempo certo ----------
+   touchTime: instante em que o dedo encostou, no relógio do áudio (desconta a demora do evento de toque).
+   outLat: atraso entre o app mandar o som e ele sair (fone com fio ~0,01 s; Bluetooth/AirPods ~0,15–0,25 s).
+   snapBeat: com o andamento rodando, se o toque caiu perto de um tempo do clique (do jeito que a pessoa estava ouvindo),
+   o pad entra exatamente nesse tempo em vez de entrar atrasado. */
+function outLat(){if(!ctx)return 0;const l=(ctx.outputLatency||0)+(ctx.baseLatency||0);return l>0&&l<0.5?l:0}
+function touchTime(e){if(!ctx)return 0;let d=0;try{const pn=performance.now();if(e&&e.timeStamp>0&&e.timeStamp<=pn+5)d=Math.min(0.1,Math.max(0,(pn-e.timeStamp)/1000))}catch(_){}return ctx.currentTime-d}
+function snapBeat(t0){if(!running||!ctx||!(t0>0))return null;const spb=60/S.bpm,h=t0-outLat(),n=Math.round((h-nextBeatTime)/spb),B=nextBeatTime+n*spb;
+  return Math.abs(h-B)<=Math.min(0.35*spb,0.22)?B:null}
+function startNow(p,t0,at){
+  // entra no tempo do clique mais perto do toque; sem clique por perto, no instante em que o dedo encostou (no máx. 0,4 s atrás)
+  const now=ctx.currentTime;let t=at!=null?at:snapBeat(t0);if(t==null)t=(t0&&t0<=now&&now-t0<0.4)?t0:now+0.01;
+  p.free=true;p.state='playing';p.startBeat=beatIndex;
+  if(p.mode==='steps'){p.nextT=t;p.stepIdx=0;const h=30/S.bpm,late=now-t;
+    if(late>0.02){ // o tempo do toque já passou: a 1ª batida sai agora e o resto segue a grade, sem amontoar batidas
+      if(late<0.25&&p.steps[0]&&p.barsOn[0])trigger(p,now);
+      while(p.nextT<now+0.005){p.stepIdx++;p.nextT+=h}}
+    freeSteps(p)}
   else{trigger(p,t);if(p.mode==='loop')p.nextT=t+loopBeats(p)*60/S.bpm}
 }
 function stopNow(p){if(ctx)stopVoice(p,ctx.currentTime);p.state='idle';p.free=false}
-async function startTransport(){
+async function startTransport(at){
   if(running||!ctx)return;ctx.resume();running=true;beatIndex=0;visQ=[];
-  nextBeatTime=ctx.currentTime+0.08;scheduler();timer=setInterval(scheduler,25);
+  nextBeatTime=at!=null?at:ctx.currentTime+0.08;scheduler();timer=setInterval(scheduler,25);
   $('play').textContent='■ Parar';$('play').classList.add('running');
   try{if(navigator.wakeLock)wakeLock=await navigator.wakeLock.request('screen')}catch(e){}
 }
@@ -745,7 +675,7 @@ function buildPads(){
     let dn=null;
     el.addEventListener('pointerdown',e=>{if(e.target.closest('.gear'))return;
       if(performance.now()-lastScroll<250){dn=null;return}
-      dn={x:e.clientX,y:e.clientY,id:e.pointerId,t:ctx?ctx.currentTime:0};el.classList.add('press')});
+      dn={x:e.clientX,y:e.clientY,id:e.pointerId,t:touchTime(e)};el.classList.add('press')});
     el.addEventListener('pointermove',e=>{if(dn&&e.pointerId===dn.id&&Math.hypot(e.clientX-dn.x,e.clientY-dn.y)>10){dn=null;el.classList.remove('press')}});
     const cancel=()=>{dn=null;el.classList.remove('press')};
     el.addEventListener('pointercancel',cancel);el.addEventListener('pointerleave',cancel);
@@ -769,7 +699,7 @@ function view(p){
   ['armed','playing','stopping'].forEach(s=>el.classList.toggle(s,has&&p.state===s));
   
   el.style.setProperty('--c',p.color);if(p._cv!==p.color){p._cv=p.color;const h=(p.color||'#888').replace('#',''),x=h.length===3?h.split('').map(c=>c+c).join(''):h,rgb=[0,2,4].map(j=>parseInt(x.substr(j,2),16)).join(',');el.style.setProperty('--c45','rgba('+rgb+',.45)');el.style.setProperty('--c26','rgba('+rgb+',.26)');el.style.setProperty('--c40','rgba('+rgb+',.4)')}
-  el.querySelector('.fx').innerHTML=has?((p.rev.on?'<i>REV</i>':'')+(p.dly.on?'<i>DLY '+DLY_DIVS[p.dly.div].s+'</i>':'')+(p.comp>0.01?'<i>CMP</i>':'')+(p.eq&&(p.eq.lo||p.eq.mid||p.eq.hi)?'<i>EQ</i>':'')+(p.eq&&p.eq.hp?'<i>HP</i>':'')+(p.eq&&p.eq.lp?'<i>LP</i>':'')+(p.cut?'<i>−ATQ</i>':'')+(p.rvs?'<i>◀◀</i>':'')):'';
+  el.querySelector('.fx').innerHTML=has?((p.eq&&(p.eq.lo||p.eq.mid||p.eq.hi)?'<i>EQ</i>':'')+(p.eq&&p.eq.hp?'<i>HP</i>':'')+(p.eq&&p.eq.lp?'<i>LP</i>':'')):'';
   el.querySelector('.nm').textContent=has?(p.name||('Pad '+(p.i+1))):'+ Adicionar áudio';
   const en=p.entry==='next'?'':' · entra no '+((+p.entry-1)%S.cycle+1);
   el.querySelector('.sub').textContent=!has?'':(p.mode==='steps'?stepsLabel(p):p.mode==='once'?'Uma vez':p.mode==='cont'?'Contínuo':('Loop · '+(p.bars==='auto'?autoBars(p)+' comp. (auto)':p.bars+' comp.')))+en;
@@ -780,7 +710,8 @@ function tapPad(p,t0){
   if(!ctx)return;wake();
   if(!p.buffer){openEdit(p);return}
   if(S.quant==='now'){
-    if(p.state==='idle'){if(!running)startTransport();startNow(p,t0)}
+    // clique parado: clique e pad começam juntos, no mesmo instante
+    if(p.state==='idle'){if(!running){const T=ctx.currentTime+0.03;startTransport(T);startNow(p,0,T)}else startNow(p,t0)}
     else stopNow(p);
     view(p);return}
   p.free=false;
@@ -893,23 +824,9 @@ function openEdit(p){
 }
 
 function fxView(p){
-  $('revOn').classList.toggle('on',p.rev.on);$('fxRev').classList.toggle('on',p.rev.on);$('revBody').classList.toggle('off',!p.rev.on);
-  $('dlyOn').classList.toggle('on',p.dly.on);$('fxDly').classList.toggle('on',p.dly.on);$('dlyBody').classList.toggle('off',!p.dly.on);
-  $('revSize').value=p.rev.size;$('revMix').value=p.rev.mix;$('dlyDiv').value=p.dly.div;$('dlyFb').value=p.dly.fb;$('dlyMix').value=p.dly.mix;
-  $('revSizeO').textContent=revLabel(p);$('revMixO').textContent=Math.round(p.rev.mix*100)+'%';
-  $('dlyDivO').textContent=dlyLabel(p);$('dlyFbO').textContent=p.dly.fb<0.05?'1':p.dly.fb<0.3?'poucas':p.dly.fb<0.6?'médias':'muitas';$('dlyMixO').textContent=Math.round(p.dly.mix*100)+'%';
-  $('cmpAmt').value=p.comp||0;$('cmpO').textContent=compLabel(p.comp||0);$('fxCmp').classList.toggle('on',(p.comp||0)>0.01);
-  $('cutOn').classList.toggle('on',!!p.cut);$('fxCut').classList.toggle('on',!!p.cut);$('cutBody').classList.toggle('off',!p.cut);
-  [...$('cutLen').children].forEach(b=>b.classList.toggle('sel',+b.dataset.v===(p.cut||p._cutLast||2)));
   eqView(p);
-  $('rvsOn').classList.toggle('on',!!p.rvs);$('fxRvs').classList.toggle('on',!!p.rvs);
   document.querySelectorAll('#modal input[type=range]').forEach(paintRange);
 }
-function fxChanged(){const p=editing;if(!p)return;applyFx(p);fxView(p);view(p);savePad(p)}
-$('cmpAmt').addEventListener('input',e=>{if(editing){editing.comp=+e.target.value;fxChanged()}});
-$('cutOn').onclick=()=>{const p=editing;if(!p)return;if(p.cut){p._cutLast=p.cut;p.cut=0}else p.cut=p._cutLast||2;fxChanged()};
-[...$('cutLen').children].forEach(b=>b.onclick=()=>{const p=editing;if(!p)return;p.cut=+b.dataset.v;p._cutLast=p.cut;fxChanged()});
-$('rvsOn').onclick=()=>{if(!editing)return;editing.rvs=!editing.rvs;fxChanged()};
 /* equalizador: 3 botões giratórios, -12 a +12 dB */
 function eqTxt(v){return v===0?'0 dB':(v>0?'+':'')+v+' dB'}
 function hpHz(v){return 20*Math.pow(100,v/24)}function lpHz(v){return 20000/Math.pow(40,v/24)}
@@ -954,17 +871,10 @@ $('kitImp').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f
   const put1=(key,rec)=>new Promise((res,rej)=>{const tx=db.transaction('pads','readwrite'),st=tx.objectStore('pads');if(rec)st.put(rec,key);else st.delete(key);tx.oncomplete=res;tx.onerror=()=>rej(tx.error||new Error('não deu para salvar'));tx.onabort=()=>rej(tx.error||new Error('sem espaço no aparelho'))});
   for(let i=0;i<n;i++){kitMsg('Importando pad '+(i+1)+' de '+n+'…');await put1(i,unpackRec(kit.pads[i]));kit.pads[i]=null}
   const am=kit.amb||[];for(let k=0;k<am.length;k++){const u=unpackRec(am[k]);am[k]=null;await put1('amb'+k,u&&u.bytes?u:null)}
-  if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','mComp','ambVol','ambFade','ambSet'])if(k in kit.S)S[k]=kit.S[k];saveS()}
+  if(kit.S){for(const k of ['bpm','beats','cycle','quant','route','clickOn','clickVol','musicVol','ambVol','ambFade','ambSet'])if(k in kit.S)S[k]=kit.S[k];saveS()}
   kitMsg('Kit importado! Recarregando…');setTimeout(()=>location.reload(),600)
 }catch(err){kitMsg('Não deu para importar: '+err.message)}};
-window.__pl={pads,openEdit};
-$('revOn').onclick=()=>{if(!editing)return;editing.rev.on=!editing.rev.on;fxChanged()};
-$('dlyOn').onclick=()=>{if(!editing)return;editing.dly.on=!editing.dly.on;fxChanged()};
-$('revSize').addEventListener('input',e=>{if(editing){editing.rev.size=+e.target.value;fxChanged()}});
-$('revMix').addEventListener('input',e=>{if(editing){editing.rev.mix=+e.target.value;fxChanged()}});
-$('dlyDiv').addEventListener('input',e=>{if(editing){editing.dly.div=+e.target.value;fxChanged()}});
-$('dlyFb').addEventListener('input',e=>{if(editing){editing.dly.fb=+e.target.value;fxChanged()}});
-$('dlyMix').addEventListener('input',e=>{if(editing){editing.dly.mix=+e.target.value;fxChanged()}});
+window.__pl={pads,openEdit,get ctx(){return ctx}};
 function paintRange(r){const mn=+r.min||0,mx=+r.max||1;r.style.setProperty('--p',((+r.value-mn)/(mx-mn)*100)+'%')}
 document.addEventListener('input',e=>{if(e.target.type==='range')paintRange(e.target)});
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')$('mClose').click()});
@@ -996,7 +906,7 @@ $('mPrev').onclick=()=>{if(editing)preview(editing)};
 $('mClose').onclick=()=>{commit();$('modal').classList.add('hidden');editing=null};
 
 /* ---------- controls ---------- */
-function setBpm(v){v=Math.max(40,Math.min(240,Math.round(v)||S.bpm));S.bpm=v;$('bpm').value=v;saveS();regenDemos();retimeFx();if(editing)fxView(editing)}
+function setBpm(v){v=Math.max(40,Math.min(240,Math.round(v)||S.bpm));S.bpm=v;$('bpm').value=v;saveS();regenDemos();if(editing)fxView(editing)}
 $('bpm').value=S.bpm;
 $('bpm').addEventListener('change',e=>setBpm(+e.target.value));
 $('minus').onclick=()=>setBpm(S.bpm-1);$('plus').onclick=()=>setBpm(S.bpm+1);
@@ -1129,8 +1039,6 @@ $('ambSet').onchange=e=>{S.ambSet=+e.target.value;saveS();
   ambEnsure(k).then(()=>{amb.loading[k]=false;if(amb.pending===null||amb.pending===k){if(!running)ambGo(k,ctx.currentTime+0.03);else amb.pending=k}ambView()})};
 $('ambFade').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.ambFade=+b.dataset.v;saveS();segView('ambFade',String(S.ambFade))};
 $('ambVol').value=S.ambVol;$('ambVol').oninput=e=>{S.ambVol=+e.target.value;saveS();applyVols()};
-$('mComp').value=S.mComp;$('mCompO').textContent=compLabel(S.mComp);
-$('mComp').oninput=e=>{S.mComp=+e.target.value;saveS();$('mCompO').textContent=compLabel(S.mComp);applyMasterComp()};
 
 $('unlockBtn').onclick=async()=>{if(ctx){if(ctx.state!=='running')rebuildAudio();else wake();$('unlock').classList.add('hidden');return}
   try{initAudio()}catch(e){__errs.push('init: '+e.message)}$('unlock').classList.add('hidden');
