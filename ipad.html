@@ -338,7 +338,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
 <div class="card">
   <div class="row" style="justify-content:space-between;margin-bottom:12px">
     <span class="lbl">Saída de áudio</span>
-    <button id="testLR" style="padding:7px 12px;font-size:13px">Testar lados</button>
+    <div class="row" style="gap:6px"><button id="reRoute" style="padding:7px 12px;font-size:13px">Reconectar som</button><button id="testLR" style="padding:7px 12px;font-size:13px">Testar lados</button></div>
   </div>
   <div class="seg route" id="route">
     <button data-v="clickL"><span class="lr lrL">L</span>Clique · <span class="lr lrR">R</span>Música</button>
@@ -349,6 +349,7 @@ details summary{cursor:pointer;color:var(--txt);font-weight:700}
   <div class="vol"><label>Música</label><input type="range" id="musicVol" min="0" max="1" step="0.01"></div>
   <div class="knob" style="margin-top:14px"><div class="kh"><span>Compressor geral (música, não afeta o clique)</span><output id="mCompO"></output></div><input type="range" id="mComp" min="0" max="1" step="0.01"></div>
   <p class="mut" id="routeInfo" style="margin:10px 0 0"></p>
+  <p class="mut" style="margin:6px 0 0">Bluetooth/AirPods: o app passa o som sozinho para a saída nova. Se ficar mudo ou sair no alto-falante, toque em <b>Reconectar som</b>. Fone Bluetooth normal: use <b>Tudo junto</b>.</p>
 </div>
 
 </div>
@@ -514,14 +515,40 @@ function initAudio(){
 /* iOS: Web Audio fica mudo com a chave de silencioso ligada. Tocar um <audio> silencioso em loop
    coloca o iPhone no modo "reprodução", que ignora a chave (igual a um app de música). */
 let silentEl=null;
-function silentWavURL(){const sr=8000,n=sr/2,b=new ArrayBuffer(44+n*2),v=new DataView(b);
+function silentWavURL(){const sr=44100,n=sr/2,b=new ArrayBuffer(44+n*2),v=new DataView(b);
   const w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i))};
   w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
   v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
   return URL.createObjectURL(new Blob([b],{type:'audio/wav'}))}
-function unmuteIOS(){try{if(!silentEl){silentEl=document.createElement('audio');silentEl.setAttribute('playsinline','');silentEl.setAttribute('x-webkit-airplay','deny');
+function unmuteIOS(){try{if(!silentEl){silentEl=document.createElement('audio');silentEl.setAttribute('playsinline','');
   silentEl.loop=true;silentEl.preload='auto';silentEl.src=silentWavURL()}const pr=silentEl.play();if(pr&&pr.catch)pr.catch(e=>__errs.push('audio tag: '+e.message))}catch(e){__errs.push('unmute: '+e.message)}}
-function wake(){if(!ctx)return;if(ctx.state!=='running'){try{ctx.resume()}catch(e){}}if(silentEl&&silentEl.paused)unmuteIOS()}
+function wake(){if(!ctx)return;try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback'}catch(e){}
+  if(ctx.state!=='running'){try{ctx.resume()}catch(e){}}if(silentEl&&silentEl.paused)unmuteIOS()}
+/* Bluetooth / AirPods / fone: quando a saída do iPhone muda com o app aberto, o iOS pode deixar o Web Audio preso
+   na saída antiga (alto-falante) ou mudo. Recriar o contexto de áudio faz o som ir para a saída atual.
+   Como o iOS só libera áudio novo num toque, a troca é feita no próximo toque na tela (ou no botão Reconectar som). */
+let needRebuild=false,wasHidden=false;
+function audioBusy(){return running||!!amb.voice||pads.some(p=>p.state!=='idle')}
+function rebuildAudio(){
+  if(!ctx)return;
+  try{
+    const was=running,ak=amb.cur;
+    if(running)stopTransport();
+    pads.forEach(p=>{p.voice=null;p.state='idle';p.free=false});paused=[];
+    amb.voice=null;amb.pending=null;amb.cur=null;
+    const old=ctx;ctx=null;old.onstatechange=null;try{old.close()}catch(e){}
+    if(silentEl){try{silentEl.pause()}catch(e){}}
+    initAudio();
+    pads.forEach(p=>{p.gain.gain.value=p.vol;applyFx(p,true)});
+    if(ak!=null)ambGo(ak,ctx.currentTime+0.05);
+    if(was)startTransport();
+    pads.forEach(view);ambView();window.__reconn=(window.__reconn||0)+1;
+  }catch(e){__errs.push('reconectar: '+e.message)}
+}
+function routeChanged(){if(!ctx)return;if(audioBusy())wake();else needRebuild=true}
+try{if(navigator.mediaDevices&&navigator.mediaDevices.addEventListener)navigator.mediaDevices.addEventListener('devicechange',()=>{if(ctx)needRebuild=true})}catch(e){}
+try{if(navigator.audioSession&&navigator.audioSession.addEventListener)navigator.audioSession.addEventListener('statechange',()=>{if(ctx&&navigator.audioSession.state==='interrupted')needRebuild=true})}catch(e){}
+document.addEventListener('pointerdown',()=>{if(needRebuild&&ctx){needRebuild=false;rebuildAudio()}},true);
 function applyRoute(){
   if(!ctx)return;const r=S.route,t=ctx.currentTime;
   const set=(g,v)=>g.gain.setTargetAtTime(v,t,0.01);
@@ -849,7 +876,7 @@ function frame1(){
   }
   if(ctx)hubView();
   if(ctx&&(++diagN%15===0)){const pp=pads.map(p=>(p.i+1)+':'+(p.buffer?p.mode[0]:'-')+(p.state[0])).join(' ');
-    $('diag').textContent='Diagnóstico: iOS '+(window.__iosV?String(window.__iosV).replace(/\.(\d)$/,'.$10').replace(/\.0*(\d+)$/,'.$1'):'?')+(document.documentElement.className.indexOf('lite')>=0?' (leve)':'')+' · áudio '+ctx.state+' · '+ctx.sampleRate+'Hz · saídas '+ctx.destination.maxChannelCount+' · sons disparados '+(window.__hits||0)+' · pads '+pp+(__errs.length?' · ERRO: '+__errs.slice(-2).join(' | '):'')}
+    $('diag').textContent='Diagnóstico: iOS '+(window.__iosV?String(window.__iosV).replace(/\.(\d)$/,'.$10').replace(/\.0*(\d+)$/,'.$1'):'?')+(document.documentElement.className.indexOf('lite')>=0?' (leve)':'')+' · áudio '+ctx.state+' · '+ctx.sampleRate+'Hz · saídas '+ctx.destination.maxChannelCount+' · sons disparados '+(window.__hits||0)+(window.__reconn?' · reconectado '+window.__reconn+'x':'')+' · pads '+pp+(__errs.length?' · ERRO: '+__errs.slice(-2).join(' | '):'')}
 }
 let diagN=0;
 
@@ -1105,11 +1132,12 @@ $('ambVol').value=S.ambVol;$('ambVol').oninput=e=>{S.ambVol=+e.target.value;save
 $('mComp').value=S.mComp;$('mCompO').textContent=compLabel(S.mComp);
 $('mComp').oninput=e=>{S.mComp=+e.target.value;saveS();$('mCompO').textContent=compLabel(S.mComp);applyMasterComp()};
 
-$('unlockBtn').onclick=async()=>{if(ctx){wake();$('unlock').classList.add('hidden');return}
+$('unlockBtn').onclick=async()=>{if(ctx){if(ctx.state!=='running')rebuildAudio();else wake();$('unlock').classList.add('hidden');return}
   try{initAudio()}catch(e){__errs.push('init: '+e.message)}$('unlock').classList.add('hidden');
   if(ctx){const t=ctx.currentTime+0.05;beep(clickBus,t,1650,0.06,0.9)}
   await loadPads()};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)wake()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){wasHidden=true;return}wake();if(wasHidden){wasHidden=false;routeChanged()}});
+$('reRoute').onclick=()=>{if(!ctx){$('unlockBtn').click();return}needRebuild=false;rebuildAudio();const t=ctx.currentTime+0.08;beep(clickBus,t,1650,0.06,0.9)};
 
 buildDots();buildBars();buildPads();buildRing();buildAmbSets();segView('ambFade',String(S.ambFade));clickView();segView('quant',S.quant);segView('route',S.route);$('routeInfo').textContent=RINFO[S.route];
 document.querySelectorAll('input[type=range]').forEach(paintRange);
